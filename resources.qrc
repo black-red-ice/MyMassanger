@@ -1,0 +1,23 @@
+<RCC>
+    <qresource prefix="/icons/lightTheme">
+        <file>images/lightTheme/calendar.svg</file>
+        <file>images/lightTheme/comments.svg</file>
+        <file>images/lightTheme/diagram-project.svg</file>
+        <file>images/lightTheme/folder.svg</file>
+        <file>images/lightTheme/gear.svg</file>
+        <file>images/lightTheme/headset.svg</file>
+        <file>images/lightTheme/list-check.svg</file>
+        <file>images/lightTheme/users.svg</file>
+    </qresource>
+    <qresource prefix="/icons/darkTheme">
+        <file>images/darkTheme/calendar.svg</file>
+        <file>images/darkTheme/comments.svg</file>
+        <file>images/darkTheme/folder.svg</file>
+        <file>images/darkTheme/gear.svg</file>
+        <file>images/darkTheme/headset.svg</file>
+        <file>images/darkTheme/list-check.svg</file>
+        <file>images/darkTheme/users.svg</file>
+        <file>images/darkTheme/diagram-project.svg</file>
+        <file>images/darkTheme/comments-solid-full.svg</file>
+    </qresource>
+</RCC>
