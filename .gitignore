@@ -1,0 +1,6 @@
+# Qt build files
+build/
+*.user
+*.user.*
+Debug/
+Release/
