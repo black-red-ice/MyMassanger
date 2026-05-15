@@ -52,6 +52,10 @@ void DocumentsPanel::onAddClicked()
     UploadDocumentDialog dialog(dimWidget);
     if (dialog.exec() == QDialog::Accepted) {
         QStringList files = dialog.selectedFiles();
+
+        // 🔥 СОХРАНЯЕМ ВРЕМЕННО В ОТДЕЛЬНЫЙ СПИСОК
+        QList<Document> newDocuments;
+
         for (const QString &filePath : files) {
             QFileInfo fi(filePath);
             Document doc;
@@ -65,7 +69,7 @@ void DocumentsPanel::onAddClicked()
             else doc.size = QString::number(size / (1024.0 * 1024.0), 'f', 1) + " МБ";
             doc.category = dialog.category();
 
-            m_documents.append(doc);
+            newDocuments.append(doc);
 
             // Загружаем файл на сервер
             MainWindow *mw = qobject_cast<MainWindow*>(this->window());
@@ -74,8 +78,14 @@ void DocumentsPanel::onAddClicked()
                 mw->uploadFileHttp(filePath, this, m_pendingDocId);
             }
         }
-        if (!files.isEmpty()) {
+
+        // 🔥 ДОБАВЛЯЕМ ТОЛЬКО ОДИН РАЗ ПОСЛЕ ЦИКЛА
+        if (!newDocuments.isEmpty()) {
+            for (const Document &doc : newDocuments) {
+                m_documents.append(doc);
+            }
             render();
+
             MainWindow *mw = qobject_cast<MainWindow*>(this->window());
             if (mw) {
                 mw->saveDocumentsToServer();
@@ -87,33 +97,43 @@ void DocumentsPanel::onAddClicked()
 
 void DocumentsPanel::filterDocuments(const QString &query)
 {
-    while (m_documentsLayout->count() > 1) {
+    // 🔥 ОЧИЩАЕМ ВСЁ, ВКЛЮЧАЯ STRETCH
+    while (m_documentsLayout->count() > 0) {
         QLayoutItem *item = m_documentsLayout->takeAt(0);
         if (item->widget()) delete item->widget();
         delete item;
     }
+
     for (const Document &doc : m_documents) {
         if (query.isEmpty() ||
             doc.name.contains(query, Qt::CaseInsensitive) ||
             doc.author.contains(query, Qt::CaseInsensitive) ||
             doc.category.contains(query, Qt::CaseInsensitive)) {
             QWidget *card = createDocumentCard(doc);
-            m_documentsLayout->insertWidget(m_documentsLayout->count() - 1, card);
+            m_documentsLayout->addWidget(card);
         }
     }
+
+    // Добавляем stretch в конец
+    m_documentsLayout->addStretch();
 }
 
 void DocumentsPanel::render()
 {
-    while (m_documentsLayout->count() > 1) {
+    // 🔥 ОЧИЩАЕМ ВСЁ, ВКЛЮЧАЯ STRETCH
+    while (m_documentsLayout->count() > 0) {
         QLayoutItem *item = m_documentsLayout->takeAt(0);
         if (item->widget()) delete item->widget();
         delete item;
     }
+
     for (const Document &doc : m_documents) {
         QWidget *card = createDocumentCard(doc);
-        m_documentsLayout->insertWidget(m_documentsLayout->count() - 1, card);
+        m_documentsLayout->addWidget(card);
     }
+
+    // Добавляем stretch в конец
+    m_documentsLayout->addStretch();
 }
 
 QString DocumentsPanel::getFileIcon(const QString &fileName) const
@@ -175,6 +195,14 @@ void DocumentsPanel::setDocumentsFromJson(const QJsonArray &arr)
 
 void DocumentsPanel::addDocument(const Document &doc)
 {
+    // 🔥 ПРОВЕРКА НА ДУБЛИКАТ ПО ID
+    for (const Document &existing : m_documents) {
+        if (existing.id == doc.id) {
+            qDebug() << "Document already exists:" << doc.name;
+            return;
+        }
+    }
+
     m_documents.append(doc);
     render();
 
@@ -188,8 +216,19 @@ bool DocumentsPanel::eventFilter(QObject *obj, QEvent *event)
 {
     if (event->type() == QEvent::MouseButtonPress) {
         QWidget *widget = qobject_cast<QWidget*>(obj);
+
+        // 🔥 ПРОВЕРЯЕМ, ЕСТЬ ЛИ PROPERTY docId У САМОГО ВИДЖЕТА ИЛИ У ЕГО РОДИТЕЛЯ
+        QString docId;
         if (widget && widget->property("docId").isValid()) {
-            QString docId = widget->property("docId").toString();
+            docId = widget->property("docId").toString();
+        } else if (widget && widget->parentWidget() && widget->parentWidget()->property("docId").isValid()) {
+            docId = widget->parentWidget()->property("docId").toString();
+        } else if (widget && widget->parentWidget() && widget->parentWidget()->parentWidget() &&
+                   widget->parentWidget()->parentWidget()->property("docId").isValid()) {
+            docId = widget->parentWidget()->parentWidget()->property("docId").toString();
+        }
+
+        if (!docId.isEmpty()) {
             onDocumentClicked(docId);
             return true;
         }
@@ -255,23 +294,39 @@ QWidget* DocumentsPanel::createDocumentCard(const Document &doc)
 
     QVBoxLayout *infoLayout = new QVBoxLayout();
     infoLayout->setSpacing(4);
+    infoLayout->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
 
     QLabel *nameLabel = new QLabel(doc.name);
     nameLabel->setStyleSheet("color: white; font-size: 14px; font-weight: 600; background: transparent;");
     nameLabel->setWordWrap(true);
+    nameLabel->setMaximumWidth(280);
+    nameLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
     infoLayout->addWidget(nameLabel);
 
     QLabel *metaLabel = new QLabel(doc.author + " | " + doc.date + " | " + doc.size);
     metaLabel->setStyleSheet("color: #94A3B8; font-size: 12px; background: transparent;");
+    metaLabel->setWordWrap(true);
+    metaLabel->setMaximumWidth(280);
     infoLayout->addWidget(metaLabel);
 
     cardLayout->addLayout(infoLayout, 1);
 
     card->setCursor(Qt::PointingHandCursor);
+
+    // 🔥 УСТАНАВЛИВАЕМ ФИЛЬТР СОБЫТИЙ НА ВСЕ ДОЧЕРНИЕ ВИДЖЕТЫ
     card->installEventFilter(this);
+    nameLabel->installEventFilter(this);
+    metaLabel->installEventFilter(this);
+    iconContainer->installEventFilter(this);
+    docIcon->installEventFilter(this);
+
     card->setProperty("docId", doc.id);
     card->setProperty("docName", doc.name);
-    card->setProperty("fileUrl", doc.fileUrl);  // Сохраняем URL
+    card->setProperty("fileUrl", doc.fileUrl);
+    nameLabel->setProperty("docId", doc.id);
+    metaLabel->setProperty("docId", doc.id);
+    iconContainer->setProperty("docId", doc.id);
+    docIcon->setProperty("docId", doc.id);
 
     return card;
 }
