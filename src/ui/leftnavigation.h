@@ -2,6 +2,7 @@
 #define LEFTNAVIGATION_H
 
 #include <QWidget>
+#include "Navigation.h"
 
 class QPushButton;
 class QVBoxLayout;
@@ -11,10 +12,11 @@ class LeftNavigation : public QWidget
     Q_OBJECT
 public:
     explicit LeftNavigation(QWidget *parent = nullptr);
+    void updateProfileAvatar();
 
 signals:
-    void currentIndexChanged(int index);   // индекс выбранного пункта (0-чаты, 1-сотрудники и т.д.)
-    void toggleSidePanel(int panelType);   // 1-сотрудники, 2-проекты, 3-задачи и т.д.
+    void currentIndexChanged(NavItem item);
+    void toggleSidePanel(int panelType);   // 1-сотрудники, 2-проекты, 3-задачи, 4-календарь, 5-документы, 6-настройки, 7-поддержка, 8-CRM-Клиенты, 9-CRM-Компании
 
 private slots:
     void onChatClicked();
@@ -25,10 +27,14 @@ private slots:
     void onDocsClicked();
     void onSettingsClicked();
     void onSupportClicked();
+    void onCrmClientsClicked();
+    void onCrmCompaniesClicked();
+    void onProfileClicked();
 
 private:
     void setupUI();
     void addNavButton(QPushButton *btn, const QString &iconPath);
+    void resetOtherButtons(QPushButton *activeBtn);
 
     QVBoxLayout* m_mainLayout;
     QPushButton* m_btnChat;
@@ -39,6 +45,10 @@ private:
     QPushButton* m_btnDocs;
     QPushButton* m_btnSettings;
     QPushButton* m_btnSupport;
+    QPushButton* m_btnCrmClients;
+    QPushButton* m_btnCrmCompanies;
+    QPushButton* m_btnProfile;
+    void setDefaultAvatar();
 
     int m_currentIndex = 0;
 };

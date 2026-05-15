@@ -1,38 +1,104 @@
 #include "NetworkManager.h"
 #include <QDebug>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonArray>
+#include <QString>
 
 NetworkManager::NetworkManager(QObject *parent)
     : QObject(parent)
 {
-    socket = new QTcpSocket(this);
+    socket = new QWebSocket();
 
-    connect(socket, &QTcpSocket::connected, this, &NetworkManager::connected);
-    connect(socket, &QTcpSocket::disconnected, this, &NetworkManager::disconnected);
-    connect(socket, &QTcpSocket::readyRead, this, &NetworkManager::onReadyRead);
-    connect(socket, &QTcpSocket::errorOccurred, this, &NetworkManager::onError);
+    connect(socket, &QWebSocket::connected, this, &NetworkManager::onConnected);
+    connect(socket, &QWebSocket::disconnected, this, &NetworkManager::onDisconnected);
+    connect(socket, &QWebSocket::textMessageReceived, this, &NetworkManager::onTextMessage);
+    connect(socket, &QWebSocket::pong, this, &NetworkManager::onPong);
+
+    // Таймер реконнекта
+    m_reconnectTimer = new QTimer(this);
+    m_reconnectTimer->setInterval(RECONNECT_INTERVAL_MS);
+    connect(m_reconnectTimer, &QTimer::timeout, this, &NetworkManager::attemptReconnect);
+
+    // Пинг-таймер для проверки живости соединения
+    m_pingTimer = new QTimer(this);
+    m_pingTimer->setInterval(15000); // каждые 15 секунд
+    connect(m_pingTimer, &QTimer::timeout, this, [this]() {
+        if (socket->state() == QAbstractSocket::ConnectedState) {
+            socket->ping();
+        }
+    });
+
+    m_host = "87.242.118.96";
+    m_port = 12345;
+    socket->open(QUrl(QString("ws://%1:%2").arg(m_host).arg(m_port)));
+}
+
+void NetworkManager::onConnected()
+{
+    qDebug() << "Connected to server";
+    m_reconnectAttempts = 0;
+    m_reconnectTimer->stop();
+    m_pingTimer->start();
+    emit connected();
+    emit reconnected();
+}
+
+void NetworkManager::onDisconnected()
+{
+    qDebug() << "Disconnected from server";
+    m_pingTimer->stop();
+    emit disconnected();
+
+    // Запускаем реконнект
+    if (m_reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+        m_reconnectTimer->start();
+        emit reconnecting();
+    }
+}
+
+void NetworkManager::onError(QAbstractSocket::SocketError error)
+{
+    Q_UNUSED(error)
+    qDebug() << "Socket error:" << socket->errorString();
+}
+
+void NetworkManager::onPong(quint64 elapsedTime, const QByteArray &payload)
+{
+    Q_UNUSED(payload)
+    qDebug() << "Pong received, latency:" << elapsedTime << "ms";
+}
+
+void NetworkManager::attemptReconnect()
+{
+    m_reconnectAttempts++;
+    qDebug() << "Reconnect attempt" << m_reconnectAttempts << "of" << MAX_RECONNECT_ATTEMPTS;
+
+    if (socket->state() != QAbstractSocket::UnconnectedState) {
+        socket->abort();
+    }
+
+    socket->open(QUrl(QString("ws://%1:%2").arg(m_host).arg(m_port)));
 }
 
 void NetworkManager::connectToServer(const QString &host, quint16 port)
 {
+    m_host = host;
+    m_port = port;
+
     if (socket->state() != QAbstractSocket::UnconnectedState) {
         socket->abort();
     }
-    socket->connectToHost(host, port);
+    socket->open(QUrl(QString("ws://%1:%2").arg(host).arg(port)));
     qDebug() << "Connecting to" << host << ":" << port;
 }
 
 void NetworkManager::disconnectFromServer()
 {
-    socket->disconnectFromHost();
-}
-
-void NetworkManager::sendMessage(const QString &message)
-{
-    if (socket->state() == QAbstractSocket::ConnectedState && !message.isEmpty()) {
-        socket->write(message.toUtf8());
-        socket->flush();
-        qDebug() << "Sent:" << message;
-    }
+    m_reconnectTimer->stop();
+    m_pingTimer->stop();
+    m_reconnectAttempts = MAX_RECONNECT_ATTEMPTS; // запрещаем реконнект
+    socket->close();
 }
 
 bool NetworkManager::isConnected() const
@@ -40,44 +106,39 @@ bool NetworkManager::isConnected() const
     return socket->state() == QAbstractSocket::ConnectedState;
 }
 
-void NetworkManager::onReadyRead()
+void NetworkManager::sendJson(const QString& type, const QJsonObject& data)
 {
-    QByteArray data = socket->readAll();
-    QString allData = QString::fromUtf8(data);
-
-    // Разделяем по \n
-    QStringList lines = allData.split('\n', Qt::SkipEmptyParts);
-
-    for (const QString &line : lines) {
-        qDebug() << "Received line:" << line;
-
-        if (line.startsWith("CONTACTS:") || line.startsWith("CHATS:") ||
-            line.startsWith("LOGIN_OK:") || line.startsWith("REGISTER_OK:") ||
-            line.startsWith("ERROR:") || line.startsWith("CONTACTS_ERROR:") ||
-            line.startsWith("CHATS_ERROR:") || line.startsWith("LOGIN_ERROR:") ||
-            line.startsWith("REGISTER_ERROR:") || line.startsWith("CHAT_READY:") ||
-            line.startsWith("MESSAGES:") || line.startsWith("MESSAGES_ERROR:") ||
-            line.startsWith("MESSAGE_SENT:") || line.startsWith("MESSAGE_ERROR:") ||
-            line.startsWith("NEW_MESSAGE:")) {  // ← ДОБАВИТЬ
-            emit commandResponse(line);
-        } else {
-            emit messageReceived(line);
+    if (!socket || socket->state() != QAbstractSocket::ConnectedState) {
+        qDebug() << "Socket not connected!";
+        // Авто-реконнект при попытке отправки
+        if (m_reconnectAttempts < MAX_RECONNECT_ATTEMPTS && !m_reconnectTimer->isActive()) {
+            qDebug() << "Triggering reconnect from sendJson...";
+            m_reconnectTimer->start();
         }
+        return;
     }
+
+    QJsonObject obj;
+    obj["type"] = type;
+    obj["data"] = data;
+
+    qDebug() << "FINAL JSON:" << QJsonDocument(obj).toJson();
+
+    QJsonDocument doc(obj);
+    QString message = doc.toJson(QJsonDocument::Compact);
+
+    socket->sendTextMessage(message);
+
+    qDebug() << "SENT JSON:" << message;
 }
 
-void NetworkManager::onError(QAbstractSocket::SocketError error)
+void NetworkManager::onTextMessage(const QString &message)
 {
-    QString errorString = socket->errorString();
-    qDebug() << "Socket error:" << error << errorString;
-    emit errorOccurred(errorString);
+    qDebug() << "RECEIVED:" << message;
+
+    QJsonDocument doc = QJsonDocument::fromJson(message.toUtf8());
+    if (!doc.isObject()) return;
+
+    emit jsonReceived(doc.object());
 }
 
-void NetworkManager::sendCommand(const QString &command)
-{
-    if (socket->state() == QAbstractSocket::ConnectedState) {
-        socket->write(command.toUtf8());
-        socket->flush();
-        qDebug() << "Command sent:" << command;
-    }
-}

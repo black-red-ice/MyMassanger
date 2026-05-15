@@ -19,5 +19,69 @@
         <file>images/darkTheme/users.svg</file>
         <file>images/darkTheme/diagram-project.svg</file>
         <file>images/darkTheme/comments-solid-full.svg</file>
+        <file>images/darkTheme/building.svg</file>
+        <file>images/darkTheme/user-tie.svg</file>
+        <file>images/darkTheme/bell.svg</file>
+        <file>images/darkTheme/palette.svg</file>
+        <file>images/darkTheme/shield.svg</file>
+        <file>images/darkTheme/circle-question.svg</file>
+        <file>images/darkTheme/coins.svg</file>
+        <file>images/darkTheme/laptop.svg</file>
+        <file>images/darkTheme/user-tie-p.svg</file>
+        <file>images/darkTheme/headset-b.svg</file>
+        <file>images/darkTheme/headset-w.svg</file>
+        <file>images/darkTheme/lock.svg</file>
+        <file>images/darkTheme/user.svg</file>
+        <file>images/darkTheme/shield-b.svg</file>
+        <file>images/darkTheme/cake.svg</file>
+        <file>images/darkTheme/envelope.svg</file>
+        <file>images/darkTheme/phone.svg</file>
+        <file>images/darkTheme/user-tie-light.svg</file>
+        <file>images/darkTheme/bell-slash.svg</file>
+        <file>images/darkTheme/thumbtack.svg</file>
+        <file>images/darkTheme/thumbtack-slash.svg</file>
+        <file>images/darkTheme/clock-light.svg</file>
+        <file>images/darkTheme/check-double-light.svg</file>
+        <file>images/darkTheme/check-light.svg</file>
+        <file>images/darkTheme/paperclip.svg</file>
+    </qresource>
+    <qresource prefix="/icons/general">
+        <file>images/general/file.svg</file>
+        <file>images/general/file-audio.svg</file>
+        <file>images/general/file-circle-question.svg</file>
+        <file>images/general/file-code.svg</file>
+        <file>images/general/file-csv.svg</file>
+        <file>images/general/file-excel.svg</file>
+        <file>images/general/file-image.svg</file>
+        <file>images/general/file-lines.svg</file>
+        <file>images/general/file-pdf.svg</file>
+        <file>images/general/file-powerpoint.svg</file>
+        <file>images/general/file-video.svg</file>
+        <file>images/general/file-word.svg</file>
+        <file>images/general/file-zipper.svg</file>
+        <file>images/general/folder.svg</file>
+        <file>images/general/magnifying-glass.svg</file>
+        <file>images/general/folder-light.svg</file>
+        <file>images/general/list-check-light.svg</file>
+        <file>images/general/square.svg</file>
+        <file>images/general/square-check.svg</file>
+        <file>images/general/trash.svg</file>
+        <file>images/general/cloud-arrow-up.svg</file>
+        <file>images/general/cloud-arrow-up-light.svg</file>
+        <file>images/general/upload-light.svg</file>
+        <file>images/general/circle-plus.svg</file>
+        <file>images/general/plus.svg</file>
+        <file>images/general/building-light.svg</file>
+        <file>images/general/user-light.svg</file>
+        <file>images/general/pen-to-square.svg</file>
+        <file>images/general/window-maximize.svg</file>
+        <file>images/general/window-minimize.svg</file>
+        <file>images/general/xmark.svg</file>
+        <file>images/general/check-double-green.svg</file>
+    </qresource>
+    <qresource prefix="/icons/authorization">
+        <file>images/authorization/apple-brands.svg</file>
+        <file>images/authorization/github-brands.svg</file>
+        <file>images/authorization/google-brands.svg</file>
     </qresource>
 </RCC>

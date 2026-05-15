@@ -8,8 +8,12 @@
 #include <QPushButton>
 #include <QComboBox>
 #include <QScrollArea>
+#include <QPixmap>
+#include <QIcon>
+#include <QPainter>
+#include <QTimer>
 
-SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent)
+SettingsDialog::SettingsDialog(QWidget *parent) : OverlayDialog(parent)
 {
     setupUI();
 }
@@ -18,16 +22,19 @@ SettingsDialog::~SettingsDialog() = default;
 
 void SettingsDialog::setupUI()
 {
-    setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint);
-    setAttribute(Qt::WA_TranslucentBackground);
     setFixedSize(560, 650);
-
     setStyleSheet("background-color: transparent;");
+
     // Контейнер с фоном и скруглением
     QWidget *container = new QWidget(this);
     container->setObjectName("container");
     container->setAutoFillBackground(true);
-    container->setStyleSheet("#container { background-color: #1e293b; border-radius: 16px; }");
+    container->setStyleSheet(
+        "#container {"
+        "  background-color: #1e293b;"
+        "  border-radius: 16px;"
+        "}"
+        );
 
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
     mainLayout->setContentsMargins(0, 0, 0, 0);
@@ -39,7 +46,12 @@ void SettingsDialog::setupUI()
 
     // ========== Заголовок ==========
     QWidget *header = new QWidget();
-    header->setStyleSheet("background-color: #1e293b; border-top-left-radius: 16px; border-top-right-radius: 16px; border-bottom: 1px solid #334155;");
+    header->setStyleSheet(
+        "background-color: #1e293b;"
+        "border-top-left-radius: 16px;"
+        "border-top-right-radius: 16px;"
+        "border-bottom: 1px solid #334155;"
+        );
     header->setFixedHeight(70);
 
     QHBoxLayout *headerLayout = new QHBoxLayout(header);
@@ -75,36 +87,40 @@ void SettingsDialog::setupUI()
     scroll->setWidgetResizable(true);
     scroll->setFrameShape(QFrame::NoFrame);
     scroll->setStyleSheet(
-        "QScrollArea { background-color: #1e293b; border: none; }"
+        "QScrollArea {"
+        "  background-color: transparent;"
+        "  border: none;"
+        "}"
         "QScrollBar:vertical {"
-        "   background-color: #1e293b;"
-        "   width: 8px;"
-        "   border-radius: 4px;"
-        "   margin: 0px;"
+        "  background-color: #1e293b;"
+        "  width: 8px;"
+        "  border-radius: 4px;"
+        "  margin: 0px;"
         "}"
         "QScrollBar::handle:vertical {"
-        "   background-color: #475569;"
-        "   border-radius: 4px;"
-        "   min-height: 30px;"
+        "  background-color: #475569;"
+        "  border-radius: 4px;"
+        "  min-height: 30px;"
         "}"
         "QScrollBar::handle:vertical:hover {"
-        "   background-color: #1d4ed8;"
+        "  background-color: #1d4ed8;"
         "}"
         "QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {"
-        "   height: 0px;"
+        "  height: 0px;"
         "}"
         "QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {"
-        "   background-color: #1e293b;"
+        "  background-color: #1e293b;"
         "}"
         );
 
     QWidget *content = new QWidget();
+    content->setStyleSheet("background-color: #1e293b;");
     QVBoxLayout *contentLayout = new QVBoxLayout(content);
     contentLayout->setContentsMargins(24, 24, 24, 24);
     contentLayout->setSpacing(20);
 
     // ========== Группа: Внешний вид ==========
-    QWidget *appearanceGroup = createSettingsGroup("🎨 Внешний вид");
+    QWidget *appearanceGroup = createSettingsGroup("Внешний вид", ":/icons/darkTheme/images/darkTheme/palette.svg");
     QVBoxLayout *appearanceLayout = qobject_cast<QVBoxLayout*>(appearanceGroup->layout());
 
     QWidget *themeItem = createSettingsItem("Тема", "Выбор цветовой схемы");
@@ -126,7 +142,7 @@ void SettingsDialog::setupUI()
     contentLayout->addWidget(appearanceGroup);
 
     // ========== Группа: Уведомления ==========
-    QWidget *notifyGroup = createSettingsGroup("🔔 Уведомления");
+    QWidget *notifyGroup = createSettingsGroup("Уведомления", ":/icons/darkTheme/images/darkTheme/bell.svg");
     QVBoxLayout *notifyLayout = qobject_cast<QVBoxLayout*>(notifyGroup->layout());
     notifyLayout->addWidget(createToggleItem("Включить уведомления", "Показывать уведомления о новых сообщениях", true));
     notifyLayout->addWidget(createToggleItem("Звуковые уведомления", "Проигрывать звук при новом сообщении", true));
@@ -134,7 +150,7 @@ void SettingsDialog::setupUI()
     contentLayout->addWidget(notifyGroup);
 
     // ========== Группа: Конфиденциальность ==========
-    QWidget *privacyGroup = createSettingsGroup("🔒 Конфиденциальность");
+    QWidget *privacyGroup = createSettingsGroup("Конфиденциальность", ":/icons/darkTheme/images/darkTheme/shield.svg");
     QVBoxLayout *privacyLayout = qobject_cast<QVBoxLayout*>(privacyGroup->layout());
 
     QWidget *statusItem = createSettingsItem("Статус \"В сети\"", "Кто может видеть ваш статус");
@@ -152,11 +168,11 @@ void SettingsDialog::setupUI()
     privacyLayout->addWidget(createToggleItem("Двухфакторная аутентификация", "Дополнительная защита аккаунта", false));
     contentLayout->addWidget(privacyGroup);
 
-    // ========== Кнопки (внутри скролл-области) ==========
+    // ========== Кнопки ==========
     QWidget *buttonWidget = new QWidget();
     buttonWidget->setStyleSheet("background-color: transparent;");
     QHBoxLayout *buttonLayout = new QHBoxLayout(buttonWidget);
-    buttonLayout->setContentsMargins(0, 20, 0, 0);
+    buttonLayout->setContentsMargins(0, 20, 0, 20);
     buttonLayout->setSpacing(12);
 
     QPushButton *cancelBtn = new QPushButton("Отмена");
@@ -181,14 +197,32 @@ void SettingsDialog::setupUI()
     buttonLayout->addWidget(saveBtn, 1);
     contentLayout->addWidget(buttonWidget);
 
-    // Устанавливаем содержимое скролл-области
-    scroll->setWidget(content);
+    // ========== Версия приложения ==========
+    QLabel *versionLabel = new QLabel("Aura v2.4.1 (build 2026.05.12)");
+    versionLabel->setAlignment(Qt::AlignCenter);
+    versionLabel->setStyleSheet(
+        "color: #64748B;"
+        "font-size: 11px;"
+        "background: transparent;"
+        "padding: 0px;"
+        "margin-top: 8px;"
+        );
+    contentLayout->addWidget(versionLabel);
 
-    // Добавляем скролл-область в основной контейнер (растягивается)
+    scroll->setWidget(content);
     containerLayout->addWidget(scroll, 1);
+    // ✅ Виджет для закругления снизу
+    QWidget *bottomRound = new QWidget();
+    bottomRound->setFixedHeight(16);
+    bottomRound->setStyleSheet(
+        "background-color: #1e293b;"
+        "border-bottom-left-radius: 16px;"
+        "border-bottom-right-radius: 16px;"
+        );
+    containerLayout->addWidget(bottomRound);
 }
 
-QWidget* SettingsDialog::createSettingsGroup(const QString &title)
+QWidget* SettingsDialog::createSettingsGroup(const QString &title, const QString &iconPath)
 {
     QWidget *group = new QWidget();
     group->setStyleSheet("QWidget { background-color: #334155; border-radius: 12px; }");
@@ -196,9 +230,29 @@ QWidget* SettingsDialog::createSettingsGroup(const QString &title)
     layout->setSpacing(0);
     layout->setContentsMargins(0, 0, 0, 0);
 
+    // Заголовок группы с иконкой
+    QWidget *titleWidget = new QWidget();
+    QHBoxLayout *titleLayout = new QHBoxLayout(titleWidget);
+    titleLayout->setContentsMargins(16, 16, 16, 12);
+    titleLayout->setSpacing(10);
+
+    // Иконка группы
+    if (!iconPath.isEmpty()) {
+        QLabel *iconLabel = new QLabel();
+        QIcon icon(iconPath);
+        QPixmap pixmap = icon.pixmap(20, 20);
+        if (!pixmap.isNull()) {
+            iconLabel->setPixmap(pixmap);
+        }
+        titleLayout->addWidget(iconLabel);
+    }
+
     QLabel *titleLabel = new QLabel(title);
-    titleLabel->setStyleSheet("color: #f1f5f9; font-size: 16px; font-weight: 600; padding: 16px 16px 12px 16px;");
-    layout->addWidget(titleLabel);
+    titleLabel->setStyleSheet("color: #f1f5f9; font-size: 16px; font-weight: 600; background-color: transparent;");
+    titleLayout->addWidget(titleLabel);
+    titleLayout->addStretch();
+
+    layout->addWidget(titleWidget);
 
     return group;
 }

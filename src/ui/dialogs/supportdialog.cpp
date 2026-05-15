@@ -5,12 +5,12 @@
 #include <QPushButton>
 #include <QGridLayout>
 #include <QFrame>
+#include <QPixmap>
+#include <QIcon>
+#include <QPainter>
+#include <QDialog>
 
-static QString getHeaderGradientColor() {
-    return "qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #0EA5E9, stop:1 #0284C7)";
-}
-
-SupportDialog::SupportDialog(QWidget *parent) : QDialog(parent)
+SupportDialog::SupportDialog(QWidget *parent) : OverlayDialog(parent)
 {
     setupUI();
 }
@@ -19,8 +19,8 @@ SupportDialog::~SupportDialog() = default;
 
 void SupportDialog::setupUI()
 {
-    setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint);
-    setAttribute(Qt::WA_TranslucentBackground);
+    //setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint);
+    //setAttribute(Qt::WA_TranslucentBackground);
     setFixedSize(500, 620);
 
     QWidget *container = new QWidget(this);
@@ -43,8 +43,16 @@ void SupportDialog::setupUI()
     QHBoxLayout *headerLayout = new QHBoxLayout(header);
     headerLayout->setContentsMargins(24, 0, 24, 0);
 
-    QLabel *titleLabel = new QLabel("🎧 Служба поддержки");
-    titleLabel->setStyleSheet("color: white; font-size: 18px; font-weight: 600; background-color: transparent;");
+    // Иконка наушников вместо эмодзи
+    QLabel *headsetIcon = new QLabel();
+    QPixmap headsetPixmap(":/icons/darkTheme/images/darkTheme/headset-w.svg");
+    if (!headsetPixmap.isNull()) {
+        headsetIcon->setPixmap(headsetPixmap.scaled(24, 24, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    }
+    headsetIcon->setStyleSheet("background-color: transparent;");
+
+    QLabel *titleLabel = new QLabel("Служба поддержки");
+    titleLabel->setStyleSheet("color: white; font-size: 18px; font-weight: 600; background-color: transparent; margin-left: 8px;");
 
     QPushButton *closeBtn = new QPushButton("✕");
     closeBtn->setFixedSize(36, 36);
@@ -55,7 +63,12 @@ void SupportDialog::setupUI()
         );
     connect(closeBtn, &QPushButton::clicked, this, &QDialog::reject);
 
-    headerLayout->addWidget(titleLabel);
+    QHBoxLayout *titleLayout = new QHBoxLayout();
+    titleLayout->setSpacing(0);
+    titleLayout->addWidget(headsetIcon);
+    titleLayout->addWidget(titleLabel);
+
+    headerLayout->addLayout(titleLayout);
     headerLayout->addStretch();
     headerLayout->addWidget(closeBtn);
 
@@ -67,14 +80,19 @@ void SupportDialog::setupUI()
     contentLayout->setContentsMargins(24, 24, 24, 24);
     contentLayout->setSpacing(20);
 
-    // Заголовок с иконкой
+    // Заголовок с большой иконкой
     QWidget *info = new QWidget();
     QVBoxLayout *infoLayout = new QVBoxLayout(info);
     infoLayout->setSpacing(8);
 
-    QLabel *headsetIcon = new QLabel("🎧");
-    headsetIcon->setAlignment(Qt::AlignCenter);
-    headsetIcon->setStyleSheet("font-size: 48px; background-color: transparent;");
+    QLabel *bigHeadsetIcon = new QLabel();
+    QPixmap bigHeadsetPixmap(":/icons/darkTheme/images/darkTheme/headset-b.svg");
+    if (!bigHeadsetPixmap.isNull()) {
+        bigHeadsetIcon->setPixmap(bigHeadsetPixmap.scaled(48, 48, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    }
+    bigHeadsetIcon->setAlignment(Qt::AlignCenter);
+    bigHeadsetIcon->setStyleSheet("background-color: transparent;");
+
     QLabel *helpTitle = new QLabel("Нужна помощь?");
     helpTitle->setAlignment(Qt::AlignCenter);
     helpTitle->setStyleSheet("color: #f1f5f9; font-size: 18px; font-weight: bold;");
@@ -82,22 +100,22 @@ void SupportDialog::setupUI()
     helpDesc->setAlignment(Qt::AlignCenter);
     helpDesc->setStyleSheet("color: #94a3b8; font-size: 14px;");
 
-    infoLayout->addWidget(headsetIcon);
+    infoLayout->addWidget(bigHeadsetIcon);
     infoLayout->addWidget(helpTitle);
     infoLayout->addWidget(helpDesc);
 
     contentLayout->addWidget(info);
 
-    // Карточки категорий
+    // Карточки категорий с SVG-иконками
     QWidget *categories = new QWidget();
     QGridLayout *grid = new QGridLayout(categories);
     grid->setSpacing(12);
     grid->setContentsMargins(0, 0, 0, 0);
 
-    grid->addWidget(createSupportCard("💻", "IT поддержка", "Проблемы с техникой, ПО", "#3B82F6"), 0, 0);
-    grid->addWidget(createSupportCard("👔", "HR вопросы", "Отпуска, документы", "#8B5CF6"), 0, 1);
-    grid->addWidget(createSupportCard("💰", "Финансы", "Зарплата, расходы", "#F59E0B"), 1, 0);
-    grid->addWidget(createSupportCard("❓", "Другое", "Иные вопросы", "#64748B"), 1, 1);
+    grid->addWidget(createSupportCard(":/icons/darkTheme/images/darkTheme/laptop.svg", "IT поддержка", "Проблемы с техникой, ПО", "#3B82F6"), 0, 0);
+    grid->addWidget(createSupportCard(":/icons/darkTheme/images/darkTheme/user-tie-p.svg", "HR вопросы", "Отпуска, документы", "#8B5CF6"), 0, 1);
+    grid->addWidget(createSupportCard(":/icons/darkTheme/images/darkTheme/coins.svg", "Финансы", "Зарплата, расходы", "#F59E0B"), 1, 0);
+    grid->addWidget(createSupportCard(":/icons/darkTheme/images/darkTheme/circle-question.svg", "Другое", "Иные вопросы", "#64748B"), 1, 1);
 
     contentLayout->addWidget(categories);
 
@@ -132,12 +150,11 @@ void SupportDialog::setupUI()
     containerLayout->addWidget(content);
 }
 
-QWidget* SupportDialog::createSupportCard(const QString &emoji, const QString &title, const QString &desc, const QString &color)
+QWidget* SupportDialog::createSupportCard(const QString &iconPath, const QString &title, const QString &desc, const QString &color)
 {
     QWidget *card = new QWidget();
     card->setCursor(Qt::PointingHandCursor);
 
-    // Единый цвет для всех карточек при наведении (фиолетовый, как у HR)
     QString hoverBorderColor = "#8B5CF6";
 
     QString styleSheet = QString(
@@ -157,9 +174,23 @@ QWidget* SupportDialog::createSupportCard(const QString &emoji, const QString &t
     layout->setContentsMargins(20, 20, 20, 20);
     layout->setSpacing(8);
 
-    QLabel *emojiLabel = new QLabel(emoji);
-    emojiLabel->setStyleSheet(QString("font-size: 28px; color: %1; background-color: transparent; border: none;").arg(color));
-    emojiLabel->setAlignment(Qt::AlignCenter);
+    // Иконка из SVG
+    QLabel *iconLabel = new QLabel();
+    QPixmap pixmap(iconPath);
+    if (!pixmap.isNull()) {
+        // Окрашиваем иконку в цвет категории
+        QPixmap coloredPixmap(pixmap.size());
+        coloredPixmap.fill(Qt::transparent);
+        QPainter painter(&coloredPixmap);
+        painter.setCompositionMode(QPainter::CompositionMode_Source);
+        painter.drawPixmap(0, 0, pixmap);
+        painter.setCompositionMode(QPainter::CompositionMode_SourceIn);
+        painter.fillRect(coloredPixmap.rect(), QColor(color));
+        painter.end();
+        iconLabel->setPixmap(coloredPixmap.scaled(32, 32, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    }
+    iconLabel->setAlignment(Qt::AlignCenter);
+    iconLabel->setStyleSheet("background-color: transparent; border: none;");
 
     QLabel *titleLabel = new QLabel(title);
     titleLabel->setStyleSheet("color: #f1f5f9; font-size: 14px; font-weight: 600; background-color: transparent; border: none;");
@@ -170,7 +201,7 @@ QWidget* SupportDialog::createSupportCard(const QString &emoji, const QString &t
     descLabel->setAlignment(Qt::AlignCenter);
     descLabel->setWordWrap(true);
 
-    layout->addWidget(emojiLabel);
+    layout->addWidget(iconLabel);
     layout->addWidget(titleLabel);
     layout->addWidget(descLabel);
 

@@ -1,12 +1,12 @@
 #ifndef SETTINGSDIALOG_H
 #define SETTINGSDIALOG_H
 
-#include <QDialog>
+#include "overlaydialog.h"  // вместо QDialog
 
 class QPushButton;
 class QComboBox;
 
-class SettingsDialog : public QDialog
+class SettingsDialog : public OverlayDialog  // изменено
 {
     Q_OBJECT
 public:
@@ -19,7 +19,7 @@ private slots:
 
 private:
     void setupUI();
-    QWidget* createSettingsGroup(const QString &title);
+    QWidget* createSettingsGroup(const QString &title, const QString &iconPath = QString());
     QWidget* createSettingsItem(const QString &title, const QString &description);
     QWidget* createToggleItem(const QString &title, const QString &description, bool checked);
 

@@ -1,9 +1,9 @@
 #ifndef SUPPORTDIALOG_H
 #define SUPPORTDIALOG_H
 
-#include <QDialog>
+#include "overlaydialog.h"  // вместо QDialog
 
-class SupportDialog : public QDialog
+class SupportDialog : public OverlayDialog  // изменено
 {
     Q_OBJECT
 public:
@@ -12,7 +12,7 @@ public:
 
 private:
     void setupUI();
-    QWidget* createSupportCard(const QString &emoji, const QString &title, const QString &desc, const QString &color);
+    QWidget* createSupportCard(const QString &iconPath, const QString &title, const QString &desc, const QString &color);
     QWidget* createTicketItem(const QString &id, const QString &title, const QString &status, const QString &statusColor);
 };
 
