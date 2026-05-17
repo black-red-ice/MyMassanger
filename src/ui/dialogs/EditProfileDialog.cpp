@@ -17,7 +17,7 @@
 EditProfileDialog::EditProfileDialog(QWidget *parent)
     : OverlayDialog(parent)
 {
-    setFixedSize(450, 610);  // Увеличили высоту
+    setFixedSize(450, 610);
     setStyleSheet("background: transparent;");
 
     QVBoxLayout *dialogLayout = new QVBoxLayout(this);
@@ -85,7 +85,6 @@ EditProfileDialog::EditProfileDialog(QWidget *parent)
     m_avatarButton->setFixedSize(90, 90);
     m_avatarButton->setCursor(Qt::PointingHandCursor);
 
-    // Функция для установки аватара по умолчанию
     auto setDefaultAvatar = [this]() {
         QPixmap defaultPixmap(":/icons/darkTheme/images/darkTheme/user.svg");
         if (!defaultPixmap.isNull()) {
@@ -135,10 +134,9 @@ EditProfileDialog::EditProfileDialog(QWidget *parent)
             QPixmap pixmap(fileName);
 
             if (!pixmap.isNull()) {
-                m_avatarPath = fileName;
+                m_avatarPath = fileName;  // Сохраняем локальный путь
 
-                QPixmap rounded =
-                    makeRoundedPixmap(pixmap, 90);
+                QPixmap rounded = makeRoundedPixmap(pixmap, 90);
 
                 m_avatarButton->setIcon(QIcon(rounded));
                 m_avatarButton->setIconSize(QSize(90, 90));
@@ -156,7 +154,6 @@ EditProfileDialog::EditProfileDialog(QWidget *parent)
     formLayout->addWidget(avatarContainer);
     formLayout->addSpacing(4);
 
-    // Подсказка под аватаром
     QLabel *avatarHint = new QLabel("Нажмите на фото, чтобы изменить");
     avatarHint->setAlignment(Qt::AlignCenter);
     avatarHint->setStyleSheet("color: #64748B; font-size: 11px; background: transparent; margin-bottom: 20px;");
@@ -182,7 +179,6 @@ EditProfileDialog::EditProfileDialog(QWidget *parent)
         "QComboBox::drop-down { border: none; width: 30px; }"
         "QComboBox QAbstractItemView { background: #0f172a; color: #f1f5f9; border: 1px solid #334155; selection-background-color: #1d4ed8; }";
 
-    // Имя
     m_name = new QLineEdit();
     m_name->setText("Александр Иванов");
     m_name->setStyleSheet(lineEditStyle);
@@ -190,7 +186,6 @@ EditProfileDialog::EditProfileDialog(QWidget *parent)
     formLayout->addLayout(createField("Имя", m_name));
     formLayout->addSpacing(12);
 
-    // Должность
     m_position = new QLineEdit();
     m_position->setText("Senior Developer");
     m_position->setStyleSheet(lineEditStyle);
@@ -198,7 +193,6 @@ EditProfileDialog::EditProfileDialog(QWidget *parent)
     formLayout->addLayout(createField("Должность", m_position));
     formLayout->addSpacing(12);
 
-    // Отдел и Табельный
     QHBoxLayout *row1 = new QHBoxLayout();
     row1->setSpacing(12);
 
@@ -230,7 +224,6 @@ EditProfileDialog::EditProfileDialog(QWidget *parent)
     formLayout->addLayout(row1);
     formLayout->addSpacing(12);
 
-    // Email и Телефон
     QHBoxLayout *row2 = new QHBoxLayout();
     row2->setSpacing(12);
 
@@ -263,10 +256,7 @@ EditProfileDialog::EditProfileDialog(QWidget *parent)
 
     // Форматирование телефона
     connect(m_phone, &QLineEdit::textChanged, this, [this](const QString &text) {
-        // Блокируем сигналы, чтобы избежать рекурсии
         m_phone->blockSignals(true);
-
-        // Оставляем только цифры и +
         QString digits;
         for (const QChar &ch : text) {
             if (ch.isDigit() || ch == '+') {
@@ -274,13 +264,12 @@ EditProfileDialog::EditProfileDialog(QWidget *parent)
             }
         }
 
-        // Форматируем
         QString formatted;
         if (digits.startsWith("+7") || digits.startsWith("7") || digits.startsWith("8")) {
             if (digits.startsWith("8")) digits = "+7" + digits.mid(1);
             if (digits.startsWith("7")) digits = "+7" + digits.mid(1);
 
-            formatted = digits.left(2); // +7
+            formatted = digits.left(2);
             if (digits.length() > 2) formatted += " (" + digits.mid(2, 3);
             if (digits.length() > 5) formatted += ") " + digits.mid(5, 3);
             if (digits.length() > 8) formatted += "-" + digits.mid(8, 2);
@@ -290,10 +279,7 @@ EditProfileDialog::EditProfileDialog(QWidget *parent)
         }
 
         m_phone->setText(formatted);
-
-        // Ставим курсор в конец
         m_phone->setCursorPosition(formatted.length());
-
         m_phone->blockSignals(false);
     });
 
@@ -314,50 +300,35 @@ EditProfileDialog::EditProfileDialog(QWidget *parent)
     QPushButton *saveBtn = new QPushButton("Сохранить");
     saveBtn->setFixedHeight(44);
     saveBtn->setCursor(Qt::PointingHandCursor);
-    saveBtn->setDefault(true);        // ← Добавить
+    saveBtn->setDefault(true);
     saveBtn->setAutoDefault(true);
     saveBtn->setStyleSheet(
         "QPushButton { background: #1d4ed8; border: none; border-radius: 10px; color: white; font-size: 14px; font-weight: 600; }"
         "QPushButton:hover { background: #2563eb; }"
         );
-    connect(saveBtn, &QPushButton::clicked, this, [this]() {
-        // Если выбран новый файл аватара
+
+    // 🔥 ГЛАВНОЕ ИСПРАВЛЕНИЕ - правильное сохранение
+    connect(saveBtn, &QPushButton::clicked, this, [this, saveBtn]() {
+        saveBtn->setEnabled(false);
+
         if (!m_avatarPath.isEmpty() && QFile::exists(m_avatarPath)) {
             if (m_mainWindow) {
-                // Загружаем на сервер и ЖДЁМ завершения
-                QEventLoop loop;
-
-                // Подключаемся к сигналу о завершении загрузки
-                // Для этого нужно добавить сигнал в MainWindow
-                connect(m_mainWindow, &MainWindow::avatarUploadCompleted,
-                        &loop, &QEventLoop::quit);
-
-                // Загружаем
+                // Просто загружаем и закрываем диалог
                 m_mainWindow->uploadAvatarToServer(m_avatarPath);
-
-                // Ждём завершения (максимум 5 секунд)
-                QTimer::singleShot(5000, &loop, &QEventLoop::quit);
-                loop.exec();
+                accept();
+                return;
             }
         }
+
         accept();
     });
-
-    saveBtn->setDefault(true);     // Enter будет нажимать "Сохранить"
-    saveBtn->setAutoDefault(true);
-    cancelBtn->setAutoDefault(false);
 
     buttonLayout->addWidget(cancelBtn, 1);
     buttonLayout->addWidget(saveBtn, 1);
     formLayout->addLayout(buttonLayout);
 
-    // Устанавливаем порядок табуляции - "Сохранить" будет последним
     setTabOrder(cancelBtn, saveBtn);
-
-    // Устанавливаем фокус на первое поле ввода
     m_name->setFocus();
-
-    // Явно указываем, что saveBtn - кнопка по умолчанию
     saveBtn->setDefault(true);
     saveBtn->setAutoDefault(true);
     cancelBtn->setAutoDefault(false);
@@ -368,7 +339,6 @@ EditProfileDialog::EditProfileDialog(QWidget *parent)
 QPixmap EditProfileDialog::makeRoundedPixmap(const QPixmap &source, int size)
 {
     QPixmap scaled = source.scaled(size, size, Qt::KeepAspectRatioByExpanding, Qt::SmoothTransformation);
-
     int x = (scaled.width() - size) / 2;
     int y = (scaled.height() - size) / 2;
     QPixmap square = scaled.copy(x, y, size, size);
@@ -380,7 +350,7 @@ QPixmap EditProfileDialog::makeRoundedPixmap(const QPixmap &source, int size)
     painter.setRenderHint(QPainter::Antialiasing, true);
 
     QPainterPath path;
-    path.addRoundedRect(0, 0, size, size, 12, 12);  // ← Заменили addEllipse на addRoundedRect
+    path.addRoundedRect(0, 0, size, size, 12, 12);
     painter.setClipPath(path);
     painter.drawPixmap(0, 0, square);
     painter.end();
@@ -391,19 +361,18 @@ QPixmap EditProfileDialog::makeRoundedPixmap(const QPixmap &source, int size)
 void EditProfileDialog::keyPressEvent(QKeyEvent *event)
 {
     if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
-        // Вызываем сохранение
-        QSettings settings("Aura", "Messenger");
-
+        // УДАЛИТЬ или ЗАКОММЕНТИРОВАТЬ этот блок:
+        /*
         if (!m_avatarPath.isEmpty() && m_mainWindow && QFile::exists(m_avatarPath)) {
-            // Загружаем аватар на сервер
-            m_mainWindow->uploadAvatarToServer(m_avatarPath);
-
-            // Ждём немного, чтобы загрузка завершилась
             QEventLoop loop;
-            QTimer::singleShot(500, &loop, &QEventLoop::quit);
+            auto connection = connect(m_mainWindow, &MainWindow::avatarUploadCompleted,
+                                      [&](const QString &) { loop.quit(); });
+            m_mainWindow->uploadAvatarToServer(m_avatarPath);
+            QTimer::singleShot(5000, &loop, &QEventLoop::quit);
             loop.exec();
+            disconnect(connection);
         }
-
+        */
         accept();
         return;
     }
@@ -424,6 +393,7 @@ void EditProfileDialog::setDepartment(const QString &department) { m_department-
 void EditProfileDialog::setEmail(const QString &email) { m_email->setText(email); }
 void EditProfileDialog::setPhone(const QString &phone) { m_phone->setText(phone); }
 void EditProfileDialog::setTabNumber(const QString &tabNumber) { m_tabNumber->setText(tabNumber); }
+
 void EditProfileDialog::setAvatarPath(const QString &path)
 {
     qDebug() << "=== EditProfileDialog::setAvatarPath:" << path;
@@ -434,7 +404,6 @@ void EditProfileDialog::setAvatarPath(const QString &path)
         QString loadPath = path;
 
         if (path.startsWith("/files/")) {
-            // Серверный URL — пробуем кеш
             qint64 userId = m_mainWindow ? m_mainWindow->getCurrentUserId() : 0;
             QString cachePath = QStandardPaths::writableLocation(QStandardPaths::CacheLocation)
                                 + "/avatars/" + QString::number(userId) + ".jpg";
@@ -443,7 +412,6 @@ void EditProfileDialog::setAvatarPath(const QString &path)
                 qDebug() << "Loading avatar from cache:" << loadPath;
             } else {
                 qDebug() << "Avatar not in cache yet for user:" << userId;
-                // Показываем первую букву
                 m_avatarButton->setText(m_name->text().left(1).toUpper());
                 m_avatarButton->setIcon(QIcon());
                 m_avatarButton->setStyleSheet(
@@ -467,11 +435,8 @@ void EditProfileDialog::setAvatarPath(const QString &path)
         }
     }
 
-    // Если не загрузили - показываем первую букву
     QString name = m_name ? m_name->text() : "";
-    if (name.isEmpty()) {
-        name = "User";
-    }
+    if (name.isEmpty()) name = "User";
     m_avatarButton->setText(name.left(1).toUpper());
     m_avatarButton->setIcon(QIcon());
     m_avatarButton->setStyleSheet(
@@ -479,4 +444,5 @@ void EditProfileDialog::setAvatarPath(const QString &path)
         "QPushButton:hover { background: #2563eb; border-color: #1d4ed8; }"
         );
 }
+
 void EditProfileDialog::setAvatarKey(const QString &key) { m_avatarKey = key; }

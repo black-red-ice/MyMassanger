@@ -57,10 +57,6 @@
 #include <QThread>
 #include <QNetworkProxy>
 #include <QSslConfiguration>
-#include <QHttpMultiPart>
-#include <QNetworkReply>
-
-static const QString API_SERVER = "http://87.242.118.96:8080";
 
 #ifdef Q_OS_WIN
 #include <windows.h>
@@ -78,7 +74,6 @@ static const QString API_SERVER = "http://87.242.118.96:8080";
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
 {
-    qDebug() << "🔴 API_SERVER = " << API_SERVER;
     networkManager = nullptr;
 
     qDebug() << "MainWindow constructor started";
@@ -291,9 +286,7 @@ void MainWindow::setupUI()
 
             qDebug() << "⬆️ UPLOADING IMAGE:" << fi.fileName() << "size:" << fileData.size();
 
-            QNetworkRequest request(
-                QUrl(QString(API_SERVER) + "/upload")
-                );
+            QNetworkRequest request(QUrl("http://87.242.118.96:8080/upload"));
             request.setHeader(QNetworkRequest::ContentTypeHeader, "application/octet-stream");
             request.setRawHeader("X-File-Name", fi.fileName().toUtf8());
             request.setTransferTimeout(30000);
@@ -364,9 +357,7 @@ void MainWindow::setupUI()
 
             qDebug() << "⬆️ UPLOADING FILE:" << fi.fileName() << "size:" << fileData.size();
 
-            QNetworkRequest request(
-                QUrl(QString(API_SERVER) + "/upload")
-                );
+            QNetworkRequest request(QUrl("http://87.242.118.96:8080/upload"));
             request.setHeader(QNetworkRequest::ContentTypeHeader, "application/octet-stream");
             request.setRawHeader("X-File-Name", fi.fileName().toUtf8());
             request.setTransferTimeout(30000);
@@ -2509,12 +2500,6 @@ void MainWindow::saveProfileToServer()
 
     qDebug() << "avatarPath from settings:" << avatarPath;
 
-    // 🔥 ЕСЛИ ЛОКАЛЬНЫЙ ПУТЬ - НЕ ОТПРАВЛЯЕМ
-    if (!avatarPath.isEmpty() && !avatarPath.startsWith("/files/") && !avatarPath.startsWith("http")) {
-        qDebug() << "Skipping save_profile - local path not sent to server:" << avatarPath;
-        return;
-    }
-
     QJsonObject profile;
     profile["name"] = settings.value("profile/name").toString();
     profile["position"] = settings.value("profile/position").toString();
@@ -2522,11 +2507,19 @@ void MainWindow::saveProfileToServer()
     profile["tabNumber"] = settings.value("profile/tabNumber").toString();
     profile["email"] = settings.value("profile/email").toString();
     profile["phone"] = settings.value("profile/phone").toString();
-    profile["avatarPath"] = avatarPath;
+
+    // Отправляем аватар только если это серверный URL
+    if (!avatarPath.isEmpty() && (avatarPath.startsWith("/files/") || avatarPath.startsWith("http"))) {
+        profile["avatarPath"] = avatarPath;
+    } else {
+        profile["avatarPath"] = "";  // Пустая строка если локальный путь
+    }
 
     QJsonObject data;
     data["profile"] = profile;
     networkManager->sendJson("save_profile", data);
+
+    qDebug() << "Profile sent to server, avatarPath:" << profile["avatarPath"].toString();
 }
 
 void MainWindow::requestClients()
@@ -2572,107 +2565,36 @@ void MainWindow::saveCompaniesToServer()
     networkManager->sendJson("save_companies", data);
 }
 
-void MainWindow::uploadFileHttp(const QString &filePath,
-                                DocumentsPanel *panel,
-                                const QString &docId)
+void MainWindow::uploadFileHttp(const QString &filePath, DocumentsPanel *panel, const QString &docId)
 {
-    qDebug() << "=== uploadFileHttp ===";
-    qDebug() << "FILE:" << filePath;
+    QFile *file = new QFile(filePath);
+    if (!file->open(QIODevice::ReadOnly)) { delete file; return; }
 
     QFileInfo fi(filePath);
+    QByteArray fileData = file->readAll();
+    file->deleteLater();
 
-    QFile *file = new QFile(filePath);
+    QNetworkRequest request(QUrl("http://87.242.118.96:8080/upload"));
+    request.setRawHeader("X-File-Name", fi.fileName().toUtf8());
+    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/octet-stream");
 
-    if (!file->exists()) {
-        qDebug() << "❌ FILE DOES NOT EXIST";
-        delete file;
-        return;
-    }
+    QNetworkReply *reply = m_httpManager->post(request, fileData);
 
-    if (!file->open(QIODevice::ReadOnly)) {
-        qDebug() << "❌ FILE OPEN ERROR:" << file->errorString();
-        delete file;
-        return;
-    }
-
-    qDebug() << "✅ FILE OPENED";
-    qDebug() << "SIZE:" << file->size();
-
-    QUrl url("http://87.242.118.96:8080/upload");
-
-    qDebug() << "UPLOAD URL:" << url.toString();
-
-    QNetworkRequest request(url);
-
-    request.setRawHeader(
-        "User-Agent",
-        "AuraClient"
-        );
-
-    request.setRawHeader(
-        "X-File-Name",
-        fi.fileName().toUtf8()
-        );
-
-    request.setHeader(
-        QNetworkRequest::ContentTypeHeader,
-        "application/octet-stream"
-        );
-
-    QNetworkReply *reply =
-        m_httpManager->post(request, file);
-    file->setParent(reply);
-
-    qDebug() << "POST SENT";
-
-    connect(reply, &QNetworkReply::uploadProgress,
-            this,
-            [](qint64 sent, qint64 total)
-            {
-                qDebug() << "UPLOAD PROGRESS:" << sent << "/" << total;
-            });
-
-    connect(reply, &QNetworkReply::finished, this, [reply, this]() {
-
-        qDebug() << "UPLOAD FINISHED";
-        qDebug() << "HTTP STATUS:"
-                 << reply->attribute(
-                             QNetworkRequest::HttpStatusCodeAttribute
-                             ).toInt();
-
-        qDebug() << "ERROR:" << reply->error();
-        qDebug() << "ERROR STRING:" << reply->errorString();
-
-        QByteArray response = reply->readAll();
-        qDebug() << "SERVER RESPONSE:" << response;
-
+    connect(reply, &QNetworkReply::finished, this, [reply, fi, panel, docId]() {
         if (reply->error() == QNetworkReply::NoError) {
+            QByteArray response = reply->readAll();
+            QJsonObject obj = QJsonDocument::fromJson(response).object();
+            QString fileUrl = obj["url"].toString();
 
-            QJsonDocument doc = QJsonDocument::fromJson(response);
-            QJsonObject obj = doc.object();
+            qDebug() << "✅ FILE UPLOAD SUCCESS:" << fileUrl;
 
-            QString url = obj["url"].toString();
-
-            qDebug() << "PARSED URL:" << url;
-
-            if (!url.isEmpty()) {
-
-                QSettings settings("Aura", "Messenger");
-
-                QString avatarKey =
-                    "userAvatar_" +
-                    QString::number(m_currentUserId);
-
-                settings.setValue(avatarKey, url);
-
-                qDebug() << "Avatar uploaded, URL saved:" << url;
-
-                saveProfileToServer();
-
-                m_leftNav->updateProfileAvatar();
+            // Обновляем URL документа в панели
+            if (panel && !docId.isEmpty()) {
+                panel->updateDocumentUrl(docId, fileUrl);
             }
+        } else {
+            qDebug() << "❌ UPLOAD ERROR:" << reply->errorString();
         }
-
         reply->deleteLater();
     });
 }
@@ -2680,7 +2602,7 @@ void MainWindow::uploadFileHttp(const QString &filePath,
 void MainWindow::downloadFileHttp(const QString &fileUrl, const QString &savePath)
 {
     QString fullUrl = fileUrl.startsWith("/files/")
-    ? QString(API_SERVER) + fileUrl  // ← ИСПОЛЬЗУЕМ API_SERVER
+    ? "http://87.242.118.96:8080" + fileUrl
     : fileUrl;
 
     QNetworkReply *reply = m_httpManager->get(QNetworkRequest(QUrl(fullUrl)));
@@ -2731,177 +2653,106 @@ void MainWindow::uploadAvatarToServer(const QString &localFilePath)
 {
     qDebug() << "=== uploadAvatarToServer:" << localFilePath;
 
+    QFile file(localFilePath);
+    if (!file.open(QIODevice::ReadOnly)) {
+        qDebug() << "Cannot open avatar file:" << localFilePath;
+        return;
+    }
+
     QFileInfo fi(localFilePath);
+    QByteArray fileData = file.readAll();
+    file.close();
 
-    QFile *file = new QFile(localFilePath);
-
-    if (!file->exists()) {
-        qDebug() << "❌ FILE DOES NOT EXIST";
-        delete file;
-        emit avatarUploadCompleted("");
-        return;
-    }
-
-    if (!file->open(QIODevice::ReadOnly)) {
-        qDebug() << "❌ FILE OPEN ERROR:" << file->errorString();
-        delete file;
-        emit avatarUploadCompleted("");
-        return;
-    }
-
-    qDebug() << "✅ FILE OPENED";
-    qDebug() << "SIZE:" << file->size();
-
-    QByteArray fileData = file->readAll();
-    file->close();
-    delete file;
-
-    QUrl url(QString(API_SERVER) + "/upload");
-    qDebug() << "UPLOAD URL:" << url.toString();
-
-    QNetworkRequest request(url);
-    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/octet-stream");
+    QNetworkRequest request(QUrl("http://87.242.118.96:8080/upload"));
     request.setRawHeader("X-File-Name", fi.fileName().toUtf8());
-    request.setTransferTimeout(30000);
+    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/octet-stream");
 
     QNetworkReply *reply = m_httpManager->post(request, fileData);
 
-    connect(reply, &QNetworkReply::uploadProgress, this,
-            [](qint64 sent, qint64 total) {
-                qDebug() << "UPLOAD PROGRESS:" << sent << "/" << total;
-            });
-
-    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
-        qDebug() << "=== AVATAR UPLOAD FINISHED ===";
-        qDebug() << "HTTP ERROR CODE:" << reply->error();
-        qDebug() << "ERROR STRING:" << reply->errorString();
-        qDebug() << "HTTP STATUS CODE:"
-                 << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-
+    connect(reply, &QNetworkReply::finished, this, [reply, this]() {
         if (reply->error() == QNetworkReply::NoError) {
             QByteArray response = reply->readAll();
-            qDebug() << "SERVER RESPONSE:" << response;
-
-            QJsonParseError parseError;
-            QJsonDocument doc = QJsonDocument::fromJson(response, &parseError);
-
-            if (parseError.error != QJsonParseError::NoError) {
-                qDebug() << "❌ JSON PARSE ERROR:" << parseError.errorString();
-                emit avatarUploadCompleted("");
-                reply->deleteLater();
-                return;
-            }
-
+            QJsonDocument doc = QJsonDocument::fromJson(response);
             QJsonObject obj = doc.object();
-            QString fileUrl = obj["url"].toString();
+            QString url = obj["url"].toString();
 
-            qDebug() << "✅ FILE URL:" << fileUrl;
-
-            if (!fileUrl.isEmpty()) {
-                emit avatarUploadCompleted(fileUrl);
-
+            if (!url.isEmpty()) {
                 QSettings settings("Aura", "Messenger");
                 QString avatarKey = "userAvatar_" + QString::number(m_currentUserId);
-                settings.setValue(avatarKey, fileUrl);
-                qDebug() << "Saved avatar URL to settings:" << avatarKey << "=" << fileUrl;
+                settings.setValue(avatarKey, url);
+                qDebug() << "Avatar uploaded, URL saved:" << url;
 
-                requestUserAvatar(m_currentUserId);
                 saveProfileToServer();
-
-                if (m_leftNav) {
-                    m_leftNav->updateProfileAvatar();
-                }
-            } else {
-                qDebug() << "❌ EMPTY FILE URL IN RESPONSE";
-                emit avatarUploadCompleted("");
+                m_leftNav->updateProfileAvatar();
             }
         } else {
-            qDebug() << "❌ AVATAR UPLOAD FAILED";
-            qDebug() << "ERROR CODE:" << reply->error();
-            qDebug() << "ERROR:" << reply->errorString();
-
-            QByteArray response = reply->readAll();
-            if (!response.isEmpty()) {
-                qDebug() << "SERVER ERROR RESPONSE:" << response;
-            }
-
-            emit avatarUploadCompleted("");
+            qDebug() << "Avatar upload error:" << reply->errorString();
         }
-
         reply->deleteLater();
-    });
-
-    // Обработка ошибок
-    connect(reply, &QNetworkReply::errorOccurred, this, [this, reply](QNetworkReply::NetworkError code) {
-        qDebug() << "❌ NETWORK ERROR:" << code << reply->errorString();
-        emit avatarUploadCompleted("");
     });
 }
 
 void MainWindow::downloadAvatarFromServer(const QString &avatarPath, int userId)
 {
-    if (avatarPath.startsWith("/files/")) {
-        QString fullUrl = QString(API_SERVER) + avatarPath;
-        QUrl url(fullUrl);  // ← ИСПРАВЛЕНО: создаем QUrl из fullUrl
-        qDebug() << "📥 Downloading avatar from:" << url.toString() << "for user:" << userId;
+    QString url = "http://87.242.118.96:8080" + avatarPath;
+    qDebug() << "📥 Downloading avatar from:" << url << "for user:" << userId;
 
-        QNetworkRequest request(url);
-        QNetworkReply *reply = m_httpManager->get(request);
+    QNetworkRequest request(url);
+    QNetworkReply *reply = m_httpManager->get(request);
 
-        connect(reply, &QNetworkReply::finished, this, [reply, userId, this, avatarPath]() {
-            if (reply->error() == QNetworkReply::NoError) {
-                QByteArray data = reply->readAll();
+    connect(reply, &QNetworkReply::finished, this, [reply, userId, this, avatarPath]() {
+        if (reply->error() == QNetworkReply::NoError) {
+            QByteArray data = reply->readAll();
 
-                if (data.isEmpty()) {
-                    qDebug() << "❌ Downloaded data is empty for user:" << userId;
-                    reply->deleteLater();
-                    return;
-                }
-
-                QPixmap pixmap;
-                if (!pixmap.loadFromData(data)) {
-                    qDebug() << "❌ Failed to load pixmap from data for user:" << userId;
-                    reply->deleteLater();
-                    return;
-                }
-
-                if (!pixmap.isNull()) {
-                    QString cacheDir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + "/avatars/";
-                    QDir().mkpath(cacheDir);
-                    QString cachePath = cacheDir + QString::number(userId) + ".jpg";
-
-                    if (pixmap.save(cachePath, "JPG")) {
-                        qDebug() << "✅ Avatar saved to cache:" << cachePath;
-
-                        // Обновляем m_userAvatars
-                        m_userAvatars[userId] = cachePath;
-
-                        // 🔥 СОХРАНЯЕМ В QSETTINGS КЕШИРОВАННЫЙ ПУТЬ
-                        QSettings settings("Aura", "Messenger");
-                        QString avatarKey = "userAvatar_" + QString::number(userId);
-                        settings.setValue(avatarKey, cachePath);
-
-                        // Обновляем UI
-                        if (m_middlePanel) {
-                            m_middlePanel->updateUserAvatar(userId, cachePath);
-                            m_middlePanel->updateChatAvatar(userId, cachePath);
-                        }
-                        if (m_currentContactId == userId && m_rightPanel) {
-                            m_rightPanel->setChatAvatar(cachePath);
-                        }
-                        if (userId == m_currentUserId && m_leftNav) {
-                            m_leftNav->updateProfileAvatar();
-                        }
-                    } else {
-                        qDebug() << "❌ Failed to save avatar to cache for user:" << userId;
-                    }
-                }
-            } else {
-                qDebug() << "❌ Avatar download error for user" << userId << ":" << reply->errorString();
+            if (data.isEmpty()) {
+                qDebug() << "❌ Downloaded data is empty for user:" << userId;
+                reply->deleteLater();
+                return;
             }
-            reply->deleteLater();
-        });
-    }
+
+            QPixmap pixmap;
+            if (!pixmap.loadFromData(data)) {
+                qDebug() << "❌ Failed to load pixmap from data for user:" << userId;
+                reply->deleteLater();
+                return;
+            }
+
+            if (!pixmap.isNull()) {
+                QString cacheDir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + "/avatars/";
+                QDir().mkpath(cacheDir);
+                QString cachePath = cacheDir + QString::number(userId) + ".jpg";
+
+                if (pixmap.save(cachePath, "JPG")) {
+                    qDebug() << "✅ Avatar saved to cache:" << cachePath;
+
+                    // Обновляем m_userAvatars
+                    m_userAvatars[userId] = cachePath;
+
+                    // 🔥 СОХРАНЯЕМ В QSETTINGS КЕШИРОВАННЫЙ ПУТЬ
+                    QSettings settings("Aura", "Messenger");
+                    QString avatarKey = "userAvatar_" + QString::number(userId);
+                    settings.setValue(avatarKey, cachePath);
+
+                    // Обновляем UI
+                    if (m_middlePanel) {
+                        m_middlePanel->updateUserAvatar(userId, cachePath);
+                        m_middlePanel->updateChatAvatar(userId, cachePath);
+                    }
+                    if (m_currentContactId == userId && m_rightPanel) {
+                        m_rightPanel->setChatAvatar(cachePath);
+                    }
+                    if (userId == m_currentUserId && m_leftNav) {
+                        m_leftNav->updateProfileAvatar();
+                    }
+                } else {
+                    qDebug() << "❌ Failed to save avatar to cache for user:" << userId;
+                }
+            }
+        } else {
+            qDebug() << "❌ Avatar download error for user" << userId << ":" << reply->errorString();
+        }
+        reply->deleteLater();
+    });
 }
 
 void MainWindow::updateChatAvatars()

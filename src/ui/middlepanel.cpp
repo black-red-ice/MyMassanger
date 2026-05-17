@@ -309,6 +309,15 @@ void MiddlePanel::setChats(const QList<QVariantMap>& chats)
         avatar->setObjectName(QString("chatAvatar_%1").arg(userId));
         avatar->setFixedSize(44, 44);
 
+        qDebug() << "Processing chat - userId:" << userId << "title:" << title;
+
+        if (userId > 0) {
+            m_chatAvatarButtons[userId] = avatar;
+            qDebug() << "Saved chat avatar button for userId:" << userId;
+        } else {
+            qDebug() << "WARNING: userId <= 0 for chat:" << c["id"].toInt();
+        }
+
         // Показываем первую букву
         QString firstLetter = title.isEmpty() ? "?" : title.left(1).toUpper();
         avatar->setText(firstLetter);

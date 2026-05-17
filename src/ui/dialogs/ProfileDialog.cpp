@@ -317,12 +317,27 @@ ProfileDialog::ProfileDialog(QWidget *parent)
 
             if (!newAvatarPath.isEmpty() && QFile::exists(newAvatarPath)) {
                 QPixmap pixmap(newAvatarPath);
+
                 if (!pixmap.isNull()) {
                     QPixmap rounded = makeRoundedPixmap(pixmap, 80);
+
                     m_avatarButton->setIcon(QIcon(rounded));
                     m_avatarButton->setIconSize(QSize(80, 80));
                     m_avatarButton->setText("");
-                    m_avatarButton->setStyleSheet("QPushButton { background: transparent; border-radius: 12px; border: none; }");
+
+                    m_avatarButton->setStyleSheet(
+                        "QPushButton { background: transparent; border-radius: 12px; border: none; }"
+                        );
+                }
+
+                // ТОЛЬКО upload
+                if (mw) {
+                    mw->uploadAvatarToServer(newAvatarPath);
+                }
+            } else {
+                // Аватар не менялся — просто сохраняем профиль
+                if (mw) {
+                    mw->saveProfileToServer();
                 }
             }
         }
