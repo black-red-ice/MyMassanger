@@ -321,6 +321,25 @@ EditProfileDialog::EditProfileDialog(QWidget *parent)
         "QPushButton:hover { background: #2563eb; }"
         );
     connect(saveBtn, &QPushButton::clicked, this, [this]() {
+        // Если выбран новый файл аватара
+        if (!m_avatarPath.isEmpty() && QFile::exists(m_avatarPath)) {
+            if (m_mainWindow) {
+                // Загружаем на сервер и ЖДЁМ завершения
+                QEventLoop loop;
+
+                // Подключаемся к сигналу о завершении загрузки
+                // Для этого нужно добавить сигнал в MainWindow
+                connect(m_mainWindow, &MainWindow::avatarUploadCompleted,
+                        &loop, &QEventLoop::quit);
+
+                // Загружаем
+                m_mainWindow->uploadAvatarToServer(m_avatarPath);
+
+                // Ждём завершения (максимум 5 секунд)
+                QTimer::singleShot(5000, &loop, &QEventLoop::quit);
+                loop.exec();
+            }
+        }
         accept();
     });
 
@@ -372,6 +391,19 @@ QPixmap EditProfileDialog::makeRoundedPixmap(const QPixmap &source, int size)
 void EditProfileDialog::keyPressEvent(QKeyEvent *event)
 {
     if (event->key() == Qt::Key_Return || event->key() == Qt::Key_Enter) {
+        // Вызываем сохранение
+        QSettings settings("Aura", "Messenger");
+
+        if (!m_avatarPath.isEmpty() && m_mainWindow && QFile::exists(m_avatarPath)) {
+            // Загружаем аватар на сервер
+            m_mainWindow->uploadAvatarToServer(m_avatarPath);
+
+            // Ждём немного, чтобы загрузка завершилась
+            QEventLoop loop;
+            QTimer::singleShot(500, &loop, &QEventLoop::quit);
+            loop.exec();
+        }
+
         accept();
         return;
     }
