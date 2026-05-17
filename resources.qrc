@@ -78,6 +78,7 @@
         <file>images/general/window-minimize.svg</file>
         <file>images/general/xmark.svg</file>
         <file>images/general/check-double-green.svg</file>
+        <file>images/general/download.svg</file>
     </qresource>
     <qresource prefix="/icons/authorization">
         <file>images/authorization/apple-brands.svg</file>

@@ -1,5 +1,6 @@
 #include "PhotoViewer.h"
 #include <QVBoxLayout>
+#include <QHBoxLayout>
 #include <QGuiApplication>
 #include <QScreen>
 #include <QKeyEvent>
@@ -9,6 +10,9 @@
 #include <QTimer>
 #include <QStandardPaths>
 #include <QFile>
+#include <QFileDialog>
+#include <QMessageBox>
+#include <QIcon>
 
 PhotoViewer::PhotoViewer(const QString &imagePath, QWidget *parent)
     : QDialog(parent, Qt::FramelessWindowHint | Qt::Dialog)
@@ -25,21 +29,15 @@ PhotoViewer::PhotoViewer(const QString &imagePath, QWidget *parent)
 
     QString finalPath = imagePath;
 
-    if (imagePath.startsWith("/files/") ||
-        imagePath.startsWith("http"))
-    {
-        QString cachePath =
-            QStandardPaths::writableLocation(
-                QStandardPaths::CacheLocation)
-            + "/avatars/view.jpg";
-
-        if (QFile::exists(cachePath))
-        {
+    if (imagePath.startsWith("/files/") || imagePath.startsWith("http")) {
+        QString cachePath = QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + "/avatars/view.jpg";
+        if (QFile::exists(cachePath)) {
             finalPath = cachePath;
         }
     }
 
     originalPixmap.load(finalPath);
+    m_imagePath = finalPath;
 
     if (originalPixmap.isNull()) {
         QTimer::singleShot(0, this, &PhotoViewer::close);
@@ -52,9 +50,9 @@ PhotoViewer::PhotoViewer(const QString &imagePath, QWidget *parent)
     QPixmap scaled = originalPixmap.scaled(maxWidth, maxHeight, Qt::KeepAspectRatio, Qt::SmoothTransformation);
 
     int containerWidth = scaled.width() + 40;
-    int containerHeight = scaled.height() + 50;
+    int containerHeight = scaled.height() + 60;
     containerWidth = qMax(containerWidth, 300);
-    containerHeight = qMax(containerHeight, 200);
+    containerHeight = qMax(containerHeight, 260);
 
     m_photoContainer = new QWidget(this);
     m_photoContainer->setObjectName("photoContainer");
@@ -78,17 +76,18 @@ PhotoViewer::PhotoViewer(const QString &imagePath, QWidget *parent)
         );
     photoLabel->setStyleSheet("background: transparent;");
 
+    // Кнопка закрыть
     QPushButton *closeBtn = new QPushButton("✕", m_photoContainer);
-    closeBtn->setFixedSize(36, 36);
-    closeBtn->move(containerWidth - 46, 5);
+    closeBtn->setFixedSize(32, 32);
+    closeBtn->move(containerWidth - 42, 8);
     closeBtn->setCursor(Qt::PointingHandCursor);
     closeBtn->setStyleSheet(
         "QPushButton {"
         "  background: rgba(0, 0, 0, 0.6);"
         "  border: none;"
-        "  border-radius: 18px;"
+        "  border-radius: 16px;"
         "  color: white;"
-        "  font-size: 16px;"
+        "  font-size: 14px;"
         "  font-weight: bold;"
         "}"
         "QPushButton:hover {"
@@ -96,15 +95,50 @@ PhotoViewer::PhotoViewer(const QString &imagePath, QWidget *parent)
         "}"
         );
 
+    // 🔥 КНОПКА СКАЧАТЬ - С ИКОНКОЙ ВМЕСТО ЭМОДЗИ
+    QPushButton *downloadBtn = new QPushButton(m_photoContainer);
+    downloadBtn->setFixedSize(32, 32);
+    downloadBtn->move(containerWidth - 42, 45);
+    downloadBtn->setCursor(Qt::PointingHandCursor);
+    downloadBtn->setIcon(QIcon(":/icons/general/images/general/download.svg"));
+    downloadBtn->setIconSize(QSize(18, 18));
+    downloadBtn->setStyleSheet(
+        "QPushButton {"
+        "  background: rgba(0, 0, 0, 0.6);"
+        "  border: none;"
+        "  border-radius: 16px;"
+        "  color: white;"
+        "}"
+        "QPushButton:hover {"
+        "  background: #1d4ed8;"
+        "}"
+        );
+
+    connect(closeBtn, &QPushButton::clicked, this, &PhotoViewer::close);
+    connect(downloadBtn, &QPushButton::clicked, this, &PhotoViewer::downloadImage);
+
+    installEventFilter(this);
+
     int x = (screenRect.width() - containerWidth) / 2;
     int y = (screenRect.height() - containerHeight) / 2;
     m_photoContainer->move(x, y);
-
-    connect(closeBtn, &QPushButton::clicked, this, &PhotoViewer::close);
-    installEventFilter(this);
 }
 
 PhotoViewer::~PhotoViewer() {}
+
+void PhotoViewer::downloadImage()
+{
+    QString savePath = QFileDialog::getSaveFileName(this, "Сохранить изображение",
+                                                    QFileInfo(m_imagePath).fileName(),
+                                                    "Images (*.png *.jpg *.jpeg *.bmp)");
+    if (savePath.isEmpty()) return;
+
+    if (QFile::copy(m_imagePath, savePath)) {
+        QMessageBox::information(this, "Успех", "Изображение сохранено!");
+    } else {
+        QMessageBox::warning(this, "Ошибка", "Не удалось сохранить изображение");
+    }
+}
 
 void PhotoViewer::paintEvent(QPaintEvent *event)
 {

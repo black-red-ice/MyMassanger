@@ -11,8 +11,8 @@ public:
     explicit PhotoViewer(const QString &imagePath, QWidget *parent = nullptr);
     ~PhotoViewer();
 
-signals:
-    void closed();
+private slots:
+    void downloadImage();  // 🔥 ДОБАВИТЬ
 
 protected:
     bool eventFilter(QObject *obj, QEvent *event) override;
@@ -22,4 +22,5 @@ protected:
 
 private:
     QWidget *m_photoContainer;
+    QString m_imagePath;  // 🔥 ДОБАВИТЬ
 };

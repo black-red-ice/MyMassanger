@@ -1,43 +1,49 @@
-#ifndef RIGHTPANEL_H
-#define RIGHTPANEL_H
+#pragma once
 
 #include <QWidget>
-#include <QListWidget>
 #include <QLabel>
-#include <QTextEdit>
 #include <QPushButton>
+#include <QTextEdit>
+#include <QScrollArea>
 #include <QVBoxLayout>
-#include <QFileDialog>
+#include <QHBoxLayout>
+#include <QTimer>
+#include <QListWidget>
+
+class PhotoViewer;
 
 class RightPanel : public QWidget
 {
     Q_OBJECT
+
 public:
     explicit RightPanel(QWidget *parent = nullptr);
-    void showTyping(const QString &username);
-    void setHasMore(bool hasMore);
-    void setLoadingOlder(bool loading);
-    void setContactInfo(int userId, const QString &name, bool online, const QString &lastSeen = "");
-    void setChatAvatar(const QString &avatarPath);
-    QString getChatTitle() const { return m_chatTitle->text(); }
-    void setPinned(bool pinned);
-    void addImageMessage(const QString &filePath, bool isOutgoing, int status = 0);
 
-public slots:
     void setChatTitle(const QString &title);
     void addMessage(const QString &text, bool isOutgoing = false, int status = 0);
     void clearMessages();
-    QListWidget* getMessagesList() const { return m_messagesList; }
+    void setContactInfo(int userId, const QString &name, bool online, const QString &lastSeen);
+    void setChatAvatar(const QString &avatarPath);
+    void setPinned(bool pinned);
+    void addImageMessage(const QString &filePath, bool isOutgoing, int status);
+    void showTyping(const QString &username);
+    void setHasMore(bool hasMore);
+    void setLoadingOlder(bool loading);
+    QString getChatTitle() const { return m_chatTitle ? m_chatTitle->text() : QString(); }
+
+    // Для совместимости со старым кодом
+    QScrollArea* getScrollArea() const { return m_scrollArea; }
+    QWidget* getMessagesContainer() const { return m_messagesContainer; }
 
 signals:
     void sendMessageRequested(const QString &message);
     void typing();
     void typingStop();
-    void needLoadOlder();
     void avatarClicked(int userId);
+    void needLoadOlder();
     void pinToggled(bool pinned);
     void fileAttached(const QString &filePath);
-    void downloadFileRequested(const QString &fileName, const QString &savePath);
+    void downloadFileRequested(const QString &fileUrl, const QString &savePath);
 
 protected:
     bool eventFilter(QObject *obj, QEvent *event) override;
@@ -49,31 +55,31 @@ private slots:
 
 private:
     void setupUI();
-    void setupChatHeader();  // новый метод
+    void setupChatHeader();
 
-    QLabel *m_chatTitle;
-    QLabel *m_chatStatus;
-    QLabel *m_chatAvatar;
-    QPushButton *m_pinBtn;
-    QPushButton *m_muteBtn;
-    QLabel *m_lastSeenLabel;
+    QWidget *m_chatHeader = nullptr;
+    QLabel *m_chatAvatar = nullptr;
+    QLabel *m_chatTitle = nullptr;
+    QLabel *m_lastSeenLabel = nullptr;
+    QPushButton *m_pinBtn = nullptr;
+    QPushButton *m_muteBtn = nullptr;
 
-    bool m_isPinned = false;
-    bool m_isMuted = false;
+    // Новые элементы для сообщений
+    QScrollArea *m_scrollArea = nullptr;
+    QWidget *m_messagesContainer = nullptr;
+    QVBoxLayout *m_messagesLayout = nullptr;
 
-    QListWidget* m_messagesList;
-    QTextEdit* m_messageInput;
-    QPushButton* m_sendBtn;
-    QLabel *m_typingLabel;
+    QTextEdit *m_messageInput = nullptr;
+    QPushButton *m_sendBtn = nullptr;
+    QPushButton *m_attachBtn = nullptr;
+    QLabel *m_typingLabel = nullptr;
+
     QTimer *typingTimer = nullptr;
     QTimer *typingDisplayTimer = nullptr;
-    bool m_hasMore = true;
+
+    int m_currentContactId = 0;
+    bool m_isPinned = false;
+    bool m_isMuted = false;
+    bool m_hasMore = false;
     bool m_loadingOlder = false;
-
-    int m_currentContactId = -1;
-    QWidget *m_chatHeader;
-    QPushButton *m_attachBtn;
 };
-
-
-#endif // RIGHTPANEL_H

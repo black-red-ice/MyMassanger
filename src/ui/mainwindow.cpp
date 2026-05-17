@@ -2138,8 +2138,8 @@ void MainWindow::renderChatMessages(int chatId, bool preserveScroll)
 
     // Save scroll position if preserving
     int scrollValue = 0;
-    if (preserveScroll) {
-        scrollValue = m_rightPanel->getMessagesList()->verticalScrollBar()->value();
+    if (preserveScroll && m_rightPanel && m_rightPanel->getScrollArea()) {
+        scrollValue = m_rightPanel->getScrollArea()->verticalScrollBar()->value();
     }
 
     m_rightPanel->clearMessages();
@@ -2150,8 +2150,8 @@ void MainWindow::renderChatMessages(int chatId, bool preserveScroll)
     }
 
     // Restore scroll position
-    if (preserveScroll) {
-        m_rightPanel->getMessagesList()->verticalScrollBar()->setValue(scrollValue);
+    if (preserveScroll && m_rightPanel && m_rightPanel->getScrollArea()) {
+        m_rightPanel->getScrollArea()->verticalScrollBar()->setValue(scrollValue);
     }
 }
 
@@ -2214,12 +2214,14 @@ void MainWindow::loadOlderMessages()
         return;
 
     m_loadingOlder = true;
-    m_rightPanel->setLoadingOlder(true);
+    if (m_rightPanel) {
+        m_rightPanel->setLoadingOlder(true);
+    }
 
     QJsonObject data;
     data["chat_id"] = m_currentChatId;
     data["before_id"] = minId;
-    data["limit"] = 30; // smaller batch for pagination
+    data["limit"] = 30;
 
     networkManager->sendJson("get_messages", data);
 }
