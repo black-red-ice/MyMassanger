@@ -52,10 +52,11 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QByteArray>
-#include <QHttpMultiPart>
 #include <QFileDialog>
 #include <QInputDialog>
 #include <QThread>
+#include <QNetworkProxy>
+#include <QSslConfiguration>
 
 #ifdef Q_OS_WIN
 #include <windows.h>
@@ -107,7 +108,10 @@ MainWindow::MainWindow(QWidget *parent)
     });
 #endif
 
+    // 🔥 СОЗДАЁМ m_httpManager ТОЛЬКО ОДИН РАЗ, ПОСЛЕ ВСЕХ ИНИЦИАЛИЗАЦИЙ
+    QNetworkProxyFactory::setUseSystemConfiguration(false);
     m_httpManager = new QNetworkAccessManager(this);
+    m_httpManager->setProxy(QNetworkProxy::NoProxy);
 }
 
 MainWindow::~MainWindow()
@@ -266,127 +270,145 @@ void MainWindow::setupUI()
         if (isImage) {
             m_rightPanel->addImageMessage(filePath, true, 1);
 
-            QFile *file = new QFile(filePath);
-            if (file->open(QIODevice::ReadOnly)) {
-                QFileInfo fi(filePath);
-                QByteArray fileData = file->readAll();
-                file->deleteLater();
+            // 🔥 СОЗДАЁМ НОВЫЙ QNetworkAccessManager ДЛЯ КАЖДОГО ЗАПРОСА
+            QNetworkAccessManager *uploadManager = new QNetworkAccessManager(this);
+            uploadManager->setProxy(QNetworkProxy::NoProxy);
 
-                qDebug() << "⬆️ UPLOADING IMAGE:" << fi.fileName() << "size:" << fileData.size();
-
-                QString uniqueName = QUuid::createUuid().toString(QUuid::WithoutBraces) + "." + ext;
-
-                QNetworkRequest request(QUrl("http://87.242.118.96:8080/upload"));
-                request.setRawHeader("X-File-Name", fi.fileName().toUtf8());
-                request.setHeader(QNetworkRequest::ContentTypeHeader, "application/octet-stream");
-
-                QNetworkReply *reply = m_httpManager->post(request, fileData);
-
-                connect(reply, &QNetworkReply::finished, this, [reply, fi, this]() {
-                    if (reply->error() == QNetworkReply::NoError) {
-                        QByteArray response = reply->readAll();
-                        QJsonObject obj = QJsonDocument::fromJson(response).object();
-                        QString fileUrl = obj["url"].toString();
-
-                        qDebug() << "✅ UPLOAD SUCCESS:" << fileUrl;
-
-                        if (!fileUrl.isEmpty()) {
-                            QString imageMsg = QString("🖼 %1|%2|%3")
-                                                   .arg(fi.fileName(), fileUrl, QString::number(fi.size()));
-
-                            QString clientId = QUuid::createUuid().toString(QUuid::WithoutBraces);
-
-                            // 🔥 Добавляем локальное сообщение перед отправкой
-                            Message msg;
-                            msg.id = -1;
-                            msg.chatId = m_currentChatId;
-                            msg.senderId = m_currentUserId;
-                            msg.text = imageMsg;
-                            msg.time = QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss");
-                            msg.clientId = clientId;
-                            msg.localOrder = m_nextLocalOrder++;
-                            msg.status = MessageStatus::Pending;
-
-                            auto &messages = m_chatMessages[m_currentChatId];
-                            messages.append(msg);
-
-                            qDebug() << "📤 SENDING IMAGE METADATA:" << imageMsg << "clientId:" << clientId;
-
-                            QJsonObject jsonMsg;
-                            jsonMsg["chat_id"] = m_currentChatId;
-                            jsonMsg["sender_id"] = m_currentUserId;
-                            jsonMsg["content"] = imageMsg;
-                            jsonMsg["client_id"] = clientId;
-                            networkManager->sendJson("send_message", jsonMsg);
-                        }
-                    } else {
-                        qDebug() << "❌ UPLOAD ERROR:" << reply->errorString();
-                    }
-                    reply->deleteLater();
-                });
+            QFile file(filePath);
+            if (!file.open(QIODevice::ReadOnly)) {
+                qDebug() << "Cannot open file:" << filePath;
+                uploadManager->deleteLater();
+                return;
             }
+
+            QByteArray fileData = file.readAll();
+            file.close();
+
+            qDebug() << "⬆️ UPLOADING IMAGE:" << fi.fileName() << "size:" << fileData.size();
+
+            QNetworkRequest request(QUrl("http://87.242.118.96:8080/upload"));
+            request.setHeader(QNetworkRequest::ContentTypeHeader, "application/octet-stream");
+            request.setRawHeader("X-File-Name", fi.fileName().toUtf8());
+            request.setTransferTimeout(30000);
+
+            QNetworkReply *reply = uploadManager->post(request, fileData);
+
+            reply->setProperty("fileName", fi.fileName());
+            reply->setProperty("fileData", fileData);
+
+            connect(reply, &QNetworkReply::finished, this, [reply, uploadManager, this]() {
+                if (reply->error() == QNetworkReply::NoError) {
+                    QByteArray response = reply->readAll();
+                    QJsonObject obj = QJsonDocument::fromJson(response).object();
+                    QString fileUrl = obj["url"].toString();
+
+                    qDebug() << "✅ UPLOAD SUCCESS:" << fileUrl;
+
+                    if (!fileUrl.isEmpty()) {
+                        QString fileName = reply->property("fileName").toString();
+                        qint64 fileSize = reply->property("fileData").toByteArray().size();
+                        QString imageMsg = QString("🖼 %1|%2|%3").arg(fileName, fileUrl, QString::number(fileSize));
+
+                        QString clientId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+
+                        // 🔥 ДОБАВЛЯЕМ ЛОКАЛЬНОЕ СООБЩЕНИЕ
+                        Message msg;
+                        msg.id = -1;
+                        msg.chatId = m_currentChatId;
+                        msg.senderId = m_currentUserId;
+                        msg.text = imageMsg;
+                        msg.time = QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss");
+                        msg.clientId = clientId;
+                        msg.localOrder = m_nextLocalOrder++;
+                        msg.status = MessageStatus::Pending;
+
+                        auto &messages = m_chatMessages[m_currentChatId];
+                        messages.append(msg);
+
+                        QJsonObject jsonMsg;
+                        jsonMsg["chat_id"] = m_currentChatId;
+                        jsonMsg["sender_id"] = m_currentUserId;
+                        jsonMsg["content"] = imageMsg;
+                        jsonMsg["client_id"] = clientId;
+                        networkManager->sendJson("send_message", jsonMsg);
+                    }
+                } else {
+                    qDebug() << "❌ UPLOAD ERROR:" << reply->errorString();
+                }
+                reply->deleteLater();
+                uploadManager->deleteLater();
+            });
         } else {
             // Обычный файл — загружаем через HTTP и отправляем метаданные
-            QFile *file = new QFile(filePath);
-            if (file->open(QIODevice::ReadOnly)) {
-                QFileInfo fi(filePath);
-                QByteArray fileData = file->readAll();
-                file->deleteLater();
+            m_rightPanel->addMessage("📎 " + fi.fileName(), true, static_cast<int>(MessageStatus::Pending));
 
-                qDebug() << "⬆️ UPLOADING FILE:" << fi.fileName() << "size:" << fileData.size();
+            QNetworkAccessManager *uploadManager = new QNetworkAccessManager(this);
+            uploadManager->setProxy(QNetworkProxy::NoProxy);
 
-                QNetworkRequest request(QUrl("http://87.242.118.96:8080/upload"));
-                request.setRawHeader("X-File-Name", fi.fileName().toUtf8());
-                request.setHeader(QNetworkRequest::ContentTypeHeader, "application/octet-stream");
-
-                QNetworkReply *reply = m_httpManager->post(request, fileData);
-
-                connect(reply, &QNetworkReply::finished, this, [reply, fi, this]() {
-                    if (reply->error() == QNetworkReply::NoError) {
-                        QByteArray response = reply->readAll();
-                        QJsonObject obj = QJsonDocument::fromJson(response).object();
-                        QString fileUrl = obj["url"].toString();
-
-                        qDebug() << "✅ FILE UPLOAD SUCCESS:" << fileUrl;
-
-                        if (!fileUrl.isEmpty()) {
-                            QString fileMsg = QString("📎 %1|%2|%3")
-                                                  .arg(fi.fileName(), fileUrl, QString::number(fi.size()));
-
-                            QString clientId = QUuid::createUuid().toString(QUuid::WithoutBraces);
-
-                            // Добавляем локальное сообщение
-                            Message msg;
-                            msg.id = -1;
-                            msg.chatId = m_currentChatId;
-                            msg.senderId = m_currentUserId;
-                            msg.text = fileMsg;
-                            msg.time = QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss");
-                            msg.clientId = clientId;
-                            msg.localOrder = m_nextLocalOrder++;
-                            msg.status = MessageStatus::Pending;
-
-                            auto &messages = m_chatMessages[m_currentChatId];
-                            messages.append(msg);
-
-                            // Показываем в UI
-                            m_rightPanel->addMessage("📎 " + fi.fileName(), true, static_cast<int>(MessageStatus::Pending));
-
-                            qDebug() << "📤 SENDING FILE METADATA:" << fileMsg << "clientId:" << clientId;
-
-                            QJsonObject jsonMsg;
-                            jsonMsg["chat_id"] = m_currentChatId;
-                            jsonMsg["sender_id"] = m_currentUserId;
-                            jsonMsg["content"] = fileMsg;
-                            jsonMsg["client_id"] = clientId;
-                            networkManager->sendJson("send_message", jsonMsg);
-                        }
-                    } else {
-                        qDebug() << "❌ FILE UPLOAD ERROR:" << reply->errorString();
-                    }
-                    reply->deleteLater();
-                });
+            QFile file(filePath);
+            if (!file.open(QIODevice::ReadOnly)) {
+                qDebug() << "Cannot open file:" << filePath;
+                uploadManager->deleteLater();
+                return;
             }
+
+            QByteArray fileData = file.readAll();
+            file.close();
+
+            qDebug() << "⬆️ UPLOADING FILE:" << fi.fileName() << "size:" << fileData.size();
+
+            QNetworkRequest request(QUrl("http://87.242.118.96:8080/upload"));
+            request.setHeader(QNetworkRequest::ContentTypeHeader, "application/octet-stream");
+            request.setRawHeader("X-File-Name", fi.fileName().toUtf8());
+            request.setTransferTimeout(30000);
+
+            QNetworkReply *reply = uploadManager->post(request, fileData);
+
+            reply->setProperty("fileName", fi.fileName());
+            reply->setProperty("fileData", fileData);
+
+            connect(reply, &QNetworkReply::finished, this, [reply, uploadManager, this]() {
+                if (reply->error() == QNetworkReply::NoError) {
+                    QByteArray response = reply->readAll();
+                    QJsonObject obj = QJsonDocument::fromJson(response).object();
+                    QString fileUrl = obj["url"].toString();
+
+                    qDebug() << "✅ FILE UPLOAD SUCCESS:" << fileUrl;
+
+                    if (!fileUrl.isEmpty()) {
+                        QString fileName = reply->property("fileName").toString();
+                        qint64 fileSize = reply->property("fileData").toByteArray().size();
+                        QString fileMsg = QString("📎 %1|%2|%3").arg(fileName, fileUrl, QString::number(fileSize));
+
+                        QString clientId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+
+                        // 🔥 ДОБАВЛЯЕМ ЛОКАЛЬНОЕ СООБЩЕНИЕ
+                        Message msg;
+                        msg.id = -1;
+                        msg.chatId = m_currentChatId;
+                        msg.senderId = m_currentUserId;
+                        msg.text = fileMsg;
+                        msg.time = QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss");
+                        msg.clientId = clientId;
+                        msg.localOrder = m_nextLocalOrder++;
+                        msg.status = MessageStatus::Pending;
+
+                        auto &messages = m_chatMessages[m_currentChatId];
+                        messages.append(msg);
+
+                        QJsonObject jsonMsg;
+                        jsonMsg["chat_id"] = m_currentChatId;
+                        jsonMsg["sender_id"] = m_currentUserId;
+                        jsonMsg["content"] = fileMsg;
+                        jsonMsg["client_id"] = clientId;
+                        networkManager->sendJson("send_message", jsonMsg);
+                    }
+                } else {
+                    qDebug() << "❌ FILE UPLOAD ERROR:" << reply->errorString();
+                }
+                reply->deleteLater();
+                uploadManager->deleteLater();
+            });
         }
     });
 
@@ -1660,7 +1682,9 @@ void MainWindow::onJson(const QJsonObject& obj)
                     matchedClient = true;
 
                     if (chatId == m_currentChatId) {
+                        int scrollValue = m_rightPanel->getScrollArea()->verticalScrollBar()->value();
                         renderChatMessages(chatId);
+                        m_rightPanel->getScrollArea()->verticalScrollBar()->setValue(scrollValue);
                     }
                     break;
                 }
@@ -1766,7 +1790,9 @@ void MainWindow::onJson(const QJsonObject& obj)
         QString username = d["username"].toString();
 
         if (chatId == m_currentChatId) {
-            m_rightPanel->showTyping(username);
+            int scrollValue = m_rightPanel->getScrollArea()->verticalScrollBar()->value();
+            renderChatMessages(chatId);
+            m_rightPanel->getScrollArea()->verticalScrollBar()->setValue(scrollValue);
         }
     }
     else if (type == "chat_ready") {
@@ -2625,67 +2651,40 @@ void MainWindow::uploadAvatarToServer(const QString &localFilePath)
 {
     qDebug() << "=== uploadAvatarToServer:" << localFilePath;
 
-    QFile *file = new QFile(localFilePath);
-    if (!file->open(QIODevice::ReadOnly)) {
+    QFile file(localFilePath);
+    if (!file.open(QIODevice::ReadOnly)) {
         qDebug() << "Cannot open avatar file:" << localFilePath;
-        delete file;
-        emit avatarUploadCompleted("");  // ← сигнал с ошибкой
         return;
     }
 
     QFileInfo fi(localFilePath);
-    QByteArray fileData = file->readAll();
-    file->close();
-    delete file;
+    QByteArray fileData = file.readAll();
+    file.close();
 
-    QNetworkRequest request(QUrl("http://87.242.118.96:8080/upload"));  // ← порт 8080
+    QNetworkRequest request(QUrl("http://87.242.118.96:8080/upload"));
     request.setRawHeader("X-File-Name", fi.fileName().toUtf8());
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/octet-stream");
 
     QNetworkReply *reply = m_httpManager->post(request, fileData);
 
-    connect(reply, &QNetworkReply::finished, this, [reply, localFilePath, this]() {
+    connect(reply, &QNetworkReply::finished, this, [reply, this]() {
         if (reply->error() == QNetworkReply::NoError) {
             QByteArray response = reply->readAll();
-            QJsonObject obj = QJsonDocument::fromJson(response).object();
+            QJsonDocument doc = QJsonDocument::fromJson(response);
+            QJsonObject obj = doc.object();
             QString url = obj["url"].toString();
-
-            qDebug() << "✅ UPLOAD SUCCESS, URL:" << url;
 
             if (!url.isEmpty()) {
                 QSettings settings("Aura", "Messenger");
                 QString avatarKey = "userAvatar_" + QString::number(m_currentUserId);
-
-                // Сохраняем URL
                 settings.setValue(avatarKey, url);
+                qDebug() << "Avatar uploaded, URL saved:" << url;
 
-                // Кешируем локально
-                QString cacheDir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + "/avatars/";
-                QDir().mkpath(cacheDir);
-
-                QString localPath = cacheDir + QString::number(m_currentUserId) + ".jpg";
-
-                QFile::remove(localPath);
-
-                if (QFile::copy(localFilePath, localPath)) {
-                    qDebug() << "Avatar cached:" << localPath;
-                }
-
-                // Отправляем на сервер URL
                 saveProfileToServer();
-
-                if (m_leftNav) {
-                    m_leftNav->updateProfileAvatar();
-                }
-
-                // 🔥 СИГНАЛ ОБ УСПЕШНОЙ ЗАГРУЗКЕ
-                emit avatarUploadCompleted(url);
-            } else {
-                emit avatarUploadCompleted("");
+                m_leftNav->updateProfileAvatar();
             }
         } else {
-            qDebug() << "❌ UPLOAD ERROR:" << reply->errorString();
-            emit avatarUploadCompleted("");
+            qDebug() << "Avatar upload error:" << reply->errorString();
         }
         reply->deleteLater();
     });

@@ -57,7 +57,7 @@ void RightPanel::setupUI()
     m_messagesContainer = new QWidget();
     m_messagesContainer->setStyleSheet("background: #0f172a;");
     m_messagesLayout = new QVBoxLayout(m_messagesContainer);
-    m_messagesLayout->setContentsMargins(8, 8, 8, 8);
+    m_messagesLayout->setContentsMargins(8, 16, 8, 16);
     m_messagesLayout->setSpacing(4);
     m_messagesLayout->addStretch(); // Stretch внизу
 
@@ -92,8 +92,12 @@ void RightPanel::setupUI()
     connect(m_attachBtn, &QPushButton::clicked, this, [this]() {
         QString filePath = QFileDialog::getOpenFileName(this, "Выберите файл", "",
                                                         "Все файлы (*.*);;Изображения (*.png *.jpg *.jpeg *.bmp *.gif)");
+        qDebug() << "🔴 DEBUG: File selected:" << filePath;  // ← ДОБАВИТЬ
         if (!filePath.isEmpty()) {
+            qDebug() << "🔴 DEBUG: Emitting fileAttached signal";  // ← ДОБАВИТЬ
             emit fileAttached(filePath);
+        } else {
+            qDebug() << "🔴 DEBUG: No file selected";
         }
     });
 
@@ -156,16 +160,16 @@ void RightPanel::addMessage(const QString &text, bool isOutgoing, int status)
 
     QWidget *messageWidget = new QWidget();
     messageWidget->setAttribute(Qt::WA_StyledBackground, true);
-    messageWidget->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
+    messageWidget->setStyleSheet("background: transparent;");
+    messageWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
 
     QHBoxLayout *mainLayout = new QHBoxLayout(messageWidget);
-    mainLayout->setContentsMargins(8, 2, 8, 2);
+    mainLayout->setContentsMargins(10, 8, 10, 8);
     mainLayout->setSpacing(0);
 
     QWidget *bubble = new QWidget();
     bubble->setAttribute(Qt::WA_StyledBackground, true);
-    bubble->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Minimum);
-    bubble->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::MinimumExpanding);
+    bubble->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Minimum);
 
     int maxBubbleWidth = qMax(220, (int)(this->width() * 0.33));
     bubble->setMaximumWidth(maxBubbleWidth);
@@ -175,21 +179,18 @@ void RightPanel::addMessage(const QString &text, bool isOutgoing, int status)
         bubbleStyle =
             "background-color: #1d4ed8;"
             "border-radius: 14px;"
-            "border-bottom-right-radius: 3px;"
-            "padding: 8px 12px;";
+            "border-bottom-right-radius: 3px;";
     } else {
         bubbleStyle =
             "background-color: #334155;"
             "border-radius: 14px;"
-            "border-bottom-left-radius: 3px;"
-            "padding: 8px 12px;";
+            "border-bottom-left-radius: 3px;";
     }
     bubble->setStyleSheet(bubbleStyle);
 
     QVBoxLayout *bubbleLayout = new QVBoxLayout(bubble);
-    bubbleLayout->setContentsMargins(0, 0, 0, 0);
+    bubbleLayout->setContentsMargins(12, 10, 12, 8);
     bubbleLayout->setSpacing(4);
-    bubbleLayout->setContentsMargins(12, 8, 12, 8);
 
     // === ИЗОБРАЖЕНИЕ ===
     if (isImageMessage && parts.size() >= 2) {
@@ -203,13 +204,24 @@ void RightPanel::addMessage(const QString &text, bool isOutgoing, int status)
                 int maxHeight = 180;
                 QPixmap scaled = pixmap.scaled(maxWidth, maxHeight, Qt::KeepAspectRatio, Qt::SmoothTransformation);
 
+                QPixmap rounded(scaled.size());
+                rounded.fill(Qt::transparent);
+                QPainter painter(&rounded);
+                painter.setRenderHint(QPainter::Antialiasing, true);
+                QPainterPath path;
+                path.addRoundedRect(0, 0, scaled.width(), scaled.height(), 12, 12);
+                painter.setClipPath(path);
+                painter.drawPixmap(0, 0, scaled);
+                painter.end();
+
                 QLabel *imageLabel = new QLabel();
-                imageLabel->setPixmap(scaled);
+                imageLabel->setPixmap(rounded);
                 imageLabel->setCursor(Qt::PointingHandCursor);
                 imageLabel->setProperty("imagePath", localPath);
+                imageLabel->setProperty("fileUrl", localPath);
                 imageLabel->installEventFilter(this);
-                imageLabel->setStyleSheet("background: transparent; border-radius: 8px;");
-                imageLabel->setAlignment(Qt::AlignCenter);
+                imageLabel->setStyleSheet("background: transparent;");
+                imageLabel->setFixedSize(scaled.width(), scaled.height());
                 bubbleLayout->addWidget(imageLabel);
             }
         };
@@ -295,31 +307,22 @@ void RightPanel::addMessage(const QString &text, bool isOutgoing, int status)
     // === ТЕКСТОВОЕ СООБЩЕНИЕ ===
     else {
         QString wrappedText = text;
-        wrappedText.replace(
-            QRegularExpression("(\\S{25})"),
-            "\\1\u200B"
-            );
+        wrappedText.replace(QRegularExpression("(\\S{25})"), "\\1\u200B");
         QLabel *messageLabel = new QLabel(wrappedText);
         messageLabel->setWordWrap(true);
         messageLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
-        messageLabel->setAlignment(Qt::AlignLeft | Qt::AlignTop);
-        messageLabel->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Minimum);
-        messageLabel->setMaximumWidth(maxBubbleWidth - 24);
+        messageLabel->setMaximumWidth(maxBubbleWidth - 20);
         messageLabel->setStyleSheet(
             "color: #f1f5f9;"
-            "font-family: 'Segoe UI', system-ui, sans-serif;"
             "font-size: 13px;"
             "background: transparent;"
             );
-
-        messageLabel->setMinimumHeight(1);
-        messageLabel->adjustSize();
         bubbleLayout->addWidget(messageLabel);
     }
 
     // === ВРЕМЯ И СТАТУС ===
     QHBoxLayout *metaLayout = new QHBoxLayout();
-    metaLayout->setContentsMargins(0, 4, 0, 0);
+    metaLayout->setContentsMargins(0, 0, 0, 0);
     metaLayout->setSpacing(4);
     metaLayout->addStretch();
 
@@ -328,19 +331,26 @@ void RightPanel::addMessage(const QString &text, bool isOutgoing, int status)
     metaLayout->addWidget(timeLabel);
 
     if (isOutgoing) {
-        QString statusIcon;
-        QString statusColor;
+        QLabel *statusLabel = new QLabel();
+        statusLabel->setFixedSize(14, 14);
+        statusLabel->setStyleSheet("background: transparent;");
+
+        QString iconPath;
         switch (status) {
-        case 0: statusIcon = "⏳"; statusColor = "#94a3b8"; break;
-        case 1: statusIcon = "✓"; statusColor = "#94a3b8"; break;
-        case 2: statusIcon = "✓✓"; statusColor = "#94a3b8"; break;
-        case 3: statusIcon = "✓✓"; statusColor = "#10b981"; break;
-        default: statusIcon = ""; statusColor = "#94a3b8";
+        case 0: iconPath = ":/icons/darkTheme/images/darkTheme/clock-light.svg"; break;
+        case 1: iconPath = ":/icons/darkTheme/images/darkTheme/check-light.svg"; break;
+        case 2: iconPath = ":/icons/darkTheme/images/darkTheme/check-double-light.svg"; break;
+        case 3: iconPath = ":/icons/general/images/general/check-double-green.svg"; break;
+        default: iconPath = "";
         }
 
-        QLabel *statusLabel = new QLabel(statusIcon);
-        statusLabel->setStyleSheet(QString("color: %1; font-size: 11px; background: transparent;").arg(statusColor));
-        statusLabel->setFixedWidth(20);
+        if (!iconPath.isEmpty()) {
+            QPixmap pixmap(iconPath);
+            if (!pixmap.isNull()) {
+                statusLabel->setPixmap(pixmap.scaled(14, 14, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+            }
+        }
+
         metaLayout->addWidget(statusLabel);
     }
 
@@ -400,7 +410,6 @@ bool RightPanel::eventFilter(QObject *obj, QEvent *event)
             if (label->property("imagePath").isValid()) {
                 QString imagePath = label->property("imagePath").toString();
                 if (!QFile::exists(imagePath)) return true;
-
                 PhotoViewer *viewer = new PhotoViewer(imagePath, nullptr);
                 viewer->setAttribute(Qt::WA_DeleteOnClose);
                 viewer->exec();
@@ -630,15 +639,16 @@ void RightPanel::addImageMessage(const QString &filePath, bool isOutgoing, int s
 
     QWidget *messageWidget = new QWidget();
     messageWidget->setAttribute(Qt::WA_StyledBackground, true);
+    messageWidget->setStyleSheet("background: transparent;");
     messageWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
 
     QHBoxLayout *mainLayout = new QHBoxLayout(messageWidget);
-    mainLayout->setContentsMargins(8, 2, 8, 2);
+    mainLayout->setContentsMargins(10, 8, 10, 8);
     mainLayout->setSpacing(0);
 
     QWidget *bubble = new QWidget();
     bubble->setAttribute(Qt::WA_StyledBackground, true);
-    bubble->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Preferred);
+    bubble->setSizePolicy(QSizePolicy::Maximum, QSizePolicy::Minimum);
 
     int maxBubbleWidth = qMax(220, (int)(this->width() * 0.33));
     bubble->setMaximumWidth(maxBubbleWidth);
@@ -658,7 +668,7 @@ void RightPanel::addImageMessage(const QString &filePath, bool isOutgoing, int s
     bubble->setStyleSheet(bubbleStyle);
 
     QVBoxLayout *bubbleLayout = new QVBoxLayout(bubble);
-    bubbleLayout->setContentsMargins(0, 0, 0, 0);
+    bubbleLayout->setContentsMargins(12, 10, 12, 8);
     bubbleLayout->setSpacing(4);
 
     QPixmap pixmap(filePath);
@@ -687,9 +697,9 @@ void RightPanel::addImageMessage(const QString &filePath, bool isOutgoing, int s
         bubbleLayout->addWidget(imageLabel);
     }
 
-    // Время и статус
+    // === ВРЕМЯ И СТАТУС ===
     QHBoxLayout *metaLayout = new QHBoxLayout();
-    metaLayout->setContentsMargins(0, 4, 0, 0);
+    metaLayout->setContentsMargins(0, 0, 0, 0);
     metaLayout->setSpacing(4);
     metaLayout->addStretch();
 
@@ -698,19 +708,26 @@ void RightPanel::addImageMessage(const QString &filePath, bool isOutgoing, int s
     metaLayout->addWidget(timeLabel);
 
     if (isOutgoing) {
-        QString statusIcon;
-        QString statusColor;
+        QLabel *statusLabel = new QLabel();
+        statusLabel->setFixedSize(14, 14);
+        statusLabel->setStyleSheet("background: transparent;");
+
+        QString iconPath;
         switch (status) {
-        case 0: statusIcon = "⏳"; statusColor = "#94a3b8"; break;
-        case 1: statusIcon = "✓"; statusColor = "#94a3b8"; break;
-        case 2: statusIcon = "✓✓"; statusColor = "#94a3b8"; break;
-        case 3: statusIcon = "✓✓"; statusColor = "#10b981"; break;
-        default: statusIcon = ""; statusColor = "#94a3b8";
+        case 0: iconPath = ":/icons/darkTheme/images/darkTheme/clock-light.svg"; break;
+        case 1: iconPath = ":/icons/darkTheme/images/darkTheme/check-light.svg"; break;
+        case 2: iconPath = ":/icons/darkTheme/images/darkTheme/check-double-light.svg"; break;
+        case 3: iconPath = ":/icons/general/images/general/check-double-green.svg"; break;
+        default: iconPath = "";
         }
 
-        QLabel *statusLabel = new QLabel(statusIcon);
-        statusLabel->setStyleSheet(QString("color: %1; font-size: 11px; background: transparent;").arg(statusColor));
-        statusLabel->setFixedWidth(20);
+        if (!iconPath.isEmpty()) {
+            QPixmap pixmap(iconPath);
+            if (!pixmap.isNull()) {
+                statusLabel->setPixmap(pixmap.scaled(14, 14, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+            }
+        }
+
         metaLayout->addWidget(statusLabel);
     }
 
