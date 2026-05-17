@@ -2500,12 +2500,6 @@ void MainWindow::saveProfileToServer()
 
     qDebug() << "avatarPath from settings:" << avatarPath;
 
-    // 🔥 ЕСЛИ ЛОКАЛЬНЫЙ ПУТЬ - НЕ ОТПРАВЛЯЕМ
-    if (!avatarPath.isEmpty() && !avatarPath.startsWith("/files/") && !avatarPath.startsWith("http")) {
-        qDebug() << "Skipping save_profile - local path not sent to server:" << avatarPath;
-        return;
-    }
-
     QJsonObject profile;
     profile["name"] = settings.value("profile/name").toString();
     profile["position"] = settings.value("profile/position").toString();
@@ -2513,11 +2507,19 @@ void MainWindow::saveProfileToServer()
     profile["tabNumber"] = settings.value("profile/tabNumber").toString();
     profile["email"] = settings.value("profile/email").toString();
     profile["phone"] = settings.value("profile/phone").toString();
-    profile["avatarPath"] = avatarPath;
+
+    // Отправляем аватар только если это серверный URL
+    if (!avatarPath.isEmpty() && (avatarPath.startsWith("/files/") || avatarPath.startsWith("http"))) {
+        profile["avatarPath"] = avatarPath;
+    } else {
+        profile["avatarPath"] = "";  // Пустая строка если локальный путь
+    }
 
     QJsonObject data;
     data["profile"] = profile;
     networkManager->sendJson("save_profile", data);
+
+    qDebug() << "Profile sent to server, avatarPath:" << profile["avatarPath"].toString();
 }
 
 void MainWindow::requestClients()

@@ -298,16 +298,8 @@ ProfileDialog::ProfileDialog(QWidget *parent)
             settings.setValue("profile/phone", dlg.getPhone());
 
             QString newAvatarPath = dlg.getAvatarPath();
-            if (!newAvatarPath.isEmpty()) {
-                QString avatarKeyForUser = "userAvatar_" + QString::number(userId);
-                settings.setValue(avatarKeyForUser, newAvatarPath);
-            }
 
-            MainWindow *mainWin = qobject_cast<MainWindow*>(this->parentWidget()->window());
-            if (mainWin) {
-                mainWin->saveProfileToServer();
-            }
-
+            // Обновляем UI сразу
             m_nameLabel->setText(dlg.getName());
             m_positionLabel->setText(dlg.getPosition());
             m_deptValue->setText(dlg.getDepartment());
@@ -316,6 +308,8 @@ ProfileDialog::ProfileDialog(QWidget *parent)
             m_phoneValue->setText(dlg.getPhone());
 
             if (!newAvatarPath.isEmpty() && QFile::exists(newAvatarPath)) {
+                settings.setValue(avatarKey, newAvatarPath);
+
                 QPixmap pixmap(newAvatarPath);
                 if (!pixmap.isNull()) {
                     QPixmap rounded = makeRoundedPixmap(pixmap, 80);
@@ -323,6 +317,16 @@ ProfileDialog::ProfileDialog(QWidget *parent)
                     m_avatarButton->setIconSize(QSize(80, 80));
                     m_avatarButton->setText("");
                     m_avatarButton->setStyleSheet("QPushButton { background: transparent; border-radius: 12px; border: none; }");
+                }
+
+                // Загружаем аватар на сервер (saveProfileToServer вызовется внутри после загрузки)
+                if (mw) {
+                    mw->uploadAvatarToServer(newAvatarPath);
+                }
+            } else {
+                // Аватар не менялся — просто сохраняем профиль
+                if (mw) {
+                    mw->saveProfileToServer();
                 }
             }
         }
