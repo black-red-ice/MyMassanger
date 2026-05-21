@@ -12,6 +12,7 @@
 #include "../panels/taskPanel/TasksPanel.h"
 #include "panels/documentsPanel/DocumentsPanel.h"
 #include "panels/employeesPanel/EmployeesPanel.h"
+#include "dialogs/supportdialog.h"
 #include <QStandardPaths>
 #include <QFile>
 
@@ -224,6 +225,7 @@ private:
     QString m_pendingUsername;
     QString m_pendingPassword;
     QString m_confirmationCode;
+    SupportDialog *m_supportDialog = nullptr;
 };
 
 #endif // MAINWINDOW_H

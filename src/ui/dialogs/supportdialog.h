@@ -23,9 +23,15 @@ class SupportDialog : public OverlayDialog
 
 protected:
     bool eventFilter(QObject *obj, QEvent *event) override;
+    void reject() override;
+    void closeEvent(QCloseEvent *event) override;
+
+signals:
+    void supportClosed();  // 👈 Добавить сигнал
 
 public:
     explicit SupportDialog(QWidget *parent = nullptr);
+    void setDimWidget(QWidget *dim) { m_dimWidget = dim; }
     ~SupportDialog();
 
 private slots:
@@ -51,6 +57,7 @@ private:
                           QWidget *chatContentLayout,
                           QWidget *infoContentLayout,
                           QWidget *inputWidget);
+    QWidget *m_dimWidget = nullptr;
 };
 
 #endif // SUPPORTDIALOG_H

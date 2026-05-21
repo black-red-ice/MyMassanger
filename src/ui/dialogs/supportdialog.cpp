@@ -1,5 +1,6 @@
 #include "supportdialog.h"
 #include "newticketdialog.h"
+#include "mainwindow.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -64,6 +65,7 @@ SupportDialog::SupportDialog(QWidget *parent) : OverlayDialog(parent)
 
 SupportDialog::~SupportDialog()
 {
+    qDebug() << "🔴 SupportDialog уничтожен";
     saveTickets();
 }
 
@@ -108,7 +110,9 @@ void SupportDialog::setupUI()
         "QPushButton { background-color: rgba(255,255,255,0.1); border: none; border-radius: 18px; color: white; font-size: 16px; }"
         "QPushButton:hover { background-color: rgba(255,255,255,0.2); }"
         );
-    connect(closeBtn, &QPushButton::clicked, this, &QDialog::reject);
+    connect(closeBtn, &QPushButton::clicked, this, [this]() {
+        reject();
+    });
 
     QHBoxLayout *titleLayout = new QHBoxLayout();
     titleLayout->setSpacing(0);
@@ -179,7 +183,12 @@ void SupportDialog::setupUI()
     ticketsTitle->setStyleSheet("color: #f1f5f9; font-size: 15px; font-weight: 600;");
     ticketsLayout->addWidget(ticketsTitle);
 
-    QPushButton *openTicketsBtn = new QPushButton("📂 Открыть мои обращения");
+    QPushButton *openTicketsBtn = new QPushButton(" Открыть мои обращения");
+    QPixmap folderPixmap(":/icons/general/images/general/folder-open.svg");
+    if (!folderPixmap.isNull()) {
+        openTicketsBtn->setIcon(QIcon(folderPixmap.scaled(18, 18, Qt::KeepAspectRatio, Qt::SmoothTransformation)));
+        openTicketsBtn->setIconSize(QSize(18, 18));
+    }
     openTicketsBtn->setStyleSheet(
         "QPushButton { background-color: #0EA5E9; border: none; border-radius: 12px; padding: 12px; color: white; font-weight: 500; }"
         "QPushButton:hover { background-color: #0284C7; }"
@@ -234,35 +243,115 @@ QWidget* SupportDialog::createSupportCard(const QString &iconPath, const QString
     }
     iconLabel->setAlignment(Qt::AlignCenter);
     iconLabel->setStyleSheet("background-color: transparent; border: none;");
+    // 👇 Отключаем получение событий мыши для иконки
+    iconLabel->setAttribute(Qt::WA_TransparentForMouseEvents);
 
     QLabel *titleLabel = new QLabel(title);
     titleLabel->setStyleSheet("color: #f1f5f9; font-size: 14px; font-weight: 600; background-color: transparent; border: none;");
     titleLabel->setAlignment(Qt::AlignCenter);
+    // 👇 Отключаем получение событий мыши для заголовка
+    titleLabel->setAttribute(Qt::WA_TransparentForMouseEvents);
 
     QLabel *descLabel = new QLabel(desc);
     descLabel->setStyleSheet("color: #94a3b8; font-size: 12px; background-color: transparent; border: none;");
     descLabel->setAlignment(Qt::AlignCenter);
     descLabel->setWordWrap(true);
+    // 👇 Отключаем получение событий мыши для описания
+    descLabel->setAttribute(Qt::WA_TransparentForMouseEvents);
 
     layout->addWidget(iconLabel);
     layout->addWidget(titleLabel);
     layout->addWidget(descLabel);
 
-    // Прозрачная кнопка для клика
-    QPushButton *btn = new QPushButton(card);
-    btn->setGeometry(card->rect());
-    btn->setStyleSheet("background-color: transparent; border: none;");
-    connect(btn, &QPushButton::clicked, [this, categoryKey]() {
-        onCreateTicket(categoryKey);
-    });
+    // 👇 Убираем прозрачную кнопку, вешаем обработчик на саму карточку
+    // и обновляем геометрию при изменении размера
+    card->installEventFilter(this);
+    card->setProperty("categoryKey", categoryKey);
 
     return card;
 }
 
 void SupportDialog::onCreateTicket(const QString &category)
 {
-    NewTicketDialog dialog(category, m_categoryNames[category], m_categoryColors[category], this);
+    // Конфигурации для каждой категории (строго по скриншотам)
+    TicketDialogConfig config;
+
+    if (category == "it") {
+        config.categoryKey = "it";
+        config.categoryName = "IT поддержка";
+        config.categoryColor = "#3B82F6";
+        config.title = "Новое обращение";
+        config.subtitle = "IT поддержка";
+        config.subjectPlaceholder = "Не работает VPN, Ошибка при запуске программы, Зависает компьютер";
+        config.descriptionHints = {
+            "Опишите техническую проблему:",
+            "Что именно происходит?",
+            "Когда возникла проблема?",
+            "Какие действия привели к ошибке?",
+            "Приложите скриншот если возможно"
+        };
+        config.showSubtitleAsDescription = false;
+    }
+    else if (category == "hr") {
+        config.categoryKey = "hr";
+        config.categoryName = "HR вопросы";
+        config.categoryColor = "#8B5CF6";
+        config.title = "Новое обращение";
+        config.subtitle = "HR вопросы";
+        config.subjectPlaceholder = "Оформление отпуска, Запрос справки, Кадровый учёт";
+        config.descriptionHints = {
+            "Опишите ваш вопрос:",
+            "ФИО сотрудника",
+            "Суть обращения",
+            "Желаемая дата (если применимо)",
+            "Дополнительная информация"
+        };
+        config.showSubtitleAsDescription = true;
+    }
+    else if (category == "finance") {
+        config.categoryKey = "finance";
+        config.categoryName = "Финансы";
+        config.categoryColor = "#F59E0B";
+        config.title = "Новое обращение";
+        config.subtitle = "Финансы";
+        config.subjectPlaceholder = "Задержка зарплаты, Отчёт о расходах, Бюджет отдела";
+        config.descriptionHints = {
+            "Опишите финансовый вопрос:",
+            "Период",
+            "Сумма",
+            "Статья расходов",
+            "Подробности операции"
+        };
+        config.showSubtitleAsDescription = false;
+    }
+    else { // other
+        config.categoryKey = "other";
+        config.categoryName = "Другое";
+        config.categoryColor = "#06B6D4";
+        config.title = "Новое обращение";
+        config.subtitle = "Другое";
+        config.subjectPlaceholder = "Вопрос по документации, Предложение по улучшению, Общий вопрос";
+        config.descriptionHints = {
+            "Опишите ваш вопрос подробно:",
+            "Что вас беспокоит?",
+            "Что вы хотите получить?",
+            "Дополнительная информация"
+        };
+        config.showSubtitleAsDescription = false;
+    }
+
+    qDebug() << "========================================";
+    qDebug() << "📤 Открываю диалог создания обращения";
+    qDebug() << "📤 SupportDialog видим?: " << this->isVisible();
+
+    this->hide();
+    qDebug() << "📤 SupportDialog скрыт, isVisible:" << this->isVisible();
+
+    NewTicketDialog dialog(config, this);
+    qDebug() << "📤 Запускаю dialog.exec()";
+
     if (dialog.exec() == QDialog::Accepted) {
+        qDebug() << "✅ Обращение принято";
         auto ticketData = dialog.getTicketData();
 
         SupportTicket newTicket;
@@ -275,15 +364,61 @@ void SupportDialog::onCreateTicket(const QString &category)
         newTicket.createdAt = QDateTime::currentDateTime().toString("dd.MM.yyyy HH:mm");
         newTicket.operatorName = "Назначится";
 
+        QString attachmentsInfo;
+        for (const QString &file : ticketData.attachments) {
+            QFileInfo fi(file);
+            if (!attachmentsInfo.isEmpty()) attachmentsInfo += ", ";
+            attachmentsInfo += fi.fileName();
+        }
+        if (!attachmentsInfo.isEmpty()) {
+            newTicket.message += "\n\n[Прикрепленные файлы: " + attachmentsInfo + "]";
+        }
+
         newTicket.messages.append(QPair<QString, QString>("user", ticketData.message));
         newTicket.messages.append(QPair<QString, QString>("support", "Здравствуйте! Ваше обращение принято в работу. Мы свяжемся с вами в ближайшее время."));
 
         m_tickets.prepend(newTicket);
         saveTickets();
 
-        QMessageBox::information(this, "Успех",
-                                 QString("Обращение #%1 успешно создано!").arg(newTicket.id));
+        QString priorityText = (ticketData.priority == "high") ? "Высокий" :
+                                   (ticketData.priority == "medium") ? "Средний" : "Низкий";
+
+        // 👇 Показываем окно поддержки перед QMessageBox
+        qDebug() << "📤 Показываю SupportDialog после успешной отправки";
+        this->show();
+        this->raise();
+        this->activateWindow();
+        qDebug() << "📤 SupportDialog isVisible после show():" << this->isVisible();
+
+        QMessageBox::information(this, "Успех", "...");
+        qDebug() << "📤 SupportDialog isVisible после QMessageBox:" << this->isVisible();
+
+    } else {
+        qDebug() << "❌ Обращение отменено/закрыто";
+        qDebug() << "📤 reopenSupportWindow():" << dialog.reopenSupportWindow();
+
+        if (dialog.reopenSupportWindow()) {
+            qDebug() << "📤 Показываю SupportDialog после отмены";
+            this->show();
+            this->raise();
+            this->activateWindow();
+
+            //QMessageBox::information(this, "Успех", "...");
+            qDebug() << "📤 SupportDialog isVisible после show():" << this->isVisible();
+        } else {
+            qDebug() << "⚠️ reopenSupportWindow() вернул false, не показываю";
+            if (dialog.reopenSupportWindow()) {
+                QTimer::singleShot(50, this, [this]() {
+                    show();
+                    raise();
+                    activateWindow();
+                });
+            }
+        }
     }
+
+    qDebug() << "📤 SupportDialog isVisible в конце метода:" << this->isVisible();
+    qDebug() << "========================================";
 }
 
 void SupportDialog::onOpenTicketsWorkspace()
@@ -831,6 +966,15 @@ bool SupportDialog::eventFilter(QObject *obj, QEvent *event)
 {
     if (event->type() == QEvent::MouseButtonPress) {
         QWidget *widget = qobject_cast<QWidget*>(obj);
+
+        // Обработка клика по карточке категории
+        if (widget && widget->property("categoryKey").isValid()) {
+            QString category = widget->property("categoryKey").toString();
+            onCreateTicket(category);
+            return true;
+        }
+
+        // Обработка клика по тикету в списке обращений
         if (widget && widget->property("ticketId").isValid()) {
             QString ticketId = widget->property("ticketId").toString();
 
@@ -1275,4 +1419,34 @@ void SupportDialog::openTicketDetail(const SupportTicket &ticket,
     addInfoRow("ОПЕРАТОР", ticket.operatorName, true);
 
     infoLayout->addStretch();
+}
+
+void SupportDialog::reject()
+{
+    qDebug() << "🟡 SupportDialog::reject()";
+    hide();
+
+    // Удаляем затемнение
+    if (m_dimWidget) {
+        m_dimWidget->deleteLater();
+        m_dimWidget = nullptr;
+    }
+
+    // Вызываем закрытие панели
+    QWidget *w = parentWidget();
+    while (w) {
+        if (w->inherits("MainWindow")) {
+            QMetaObject::invokeMethod(w, "onCloseSidePanel", Qt::QueuedConnection);
+            break;
+        }
+        w = w->parentWidget();
+    }
+}
+
+void SupportDialog::closeEvent(QCloseEvent *event)
+{
+    qDebug() << "🟡 SupportDialog::closeEvent - ignore, hide, emit";
+    event->ignore();
+    hide();
+    emit supportClosed();  // 👈 Сообщаем, что окно закрыто
 }

@@ -519,9 +519,23 @@ void MainWindow::onToggleSidePanel(int panelType)
         dim->setGeometry(m_centralWidget->rect());
         dim->setStyleSheet("background-color: rgba(0,0,0,150);");
         dim->show();
-        SupportDialog dialog(this);
-        dialog.exec();
-        dim->deleteLater();
+
+        // 👇 Удаляем старый SupportDialog, если есть
+        if (m_supportDialog) {
+            m_supportDialog->deleteLater();
+            m_supportDialog = nullptr;
+        }
+
+        // Создаём новый SupportDialog
+        m_supportDialog = new SupportDialog(this);
+        m_supportDialog->setAttribute(Qt::WA_DeleteOnClose, false);
+        m_supportDialog->setDimWidget(dim);
+
+        connect(m_supportDialog, &QObject::destroyed, this, [this]() {
+            m_supportDialog = nullptr;
+        });
+
+        m_supportDialog->show();
         return;
     }
 

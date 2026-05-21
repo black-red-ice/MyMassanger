@@ -44,6 +44,7 @@
         <file>images/darkTheme/check-double-light.svg</file>
         <file>images/darkTheme/check-light.svg</file>
         <file>images/darkTheme/paperclip.svg</file>
+        <file>images/general/cloud-arrow-up.svg</file>
     </qresource>
     <qresource prefix="/icons/general">
         <file>images/general/file.svg</file>
@@ -85,6 +86,14 @@
         <file>images/general/paperclip.svg</file>
         <file>images/general/circle-info.svg</file>
         <file>images/general/inbox.svg</file>
+        <file>images/general/align-left.svg</file>
+        <file>images/general/circle-question-light.svg</file>
+        <file>images/general/cloud-arrow-up-grey.svg</file>
+        <file>images/general/coins-light.svg</file>
+        <file>images/general/flag-grey.svg</file>
+        <file>images/general/heading-grey.svg</file>
+        <file>images/general/laptop-light.svg</file>
+        <file>images/general/user-tie-light.svg</file>
     </qresource>
     <qresource prefix="/icons/authorization">
         <file>images/authorization/apple-brands.svg</file>
