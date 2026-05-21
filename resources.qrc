@@ -79,6 +79,12 @@
         <file>images/general/xmark.svg</file>
         <file>images/general/check-double-green.svg</file>
         <file>images/general/download.svg</file>
+        <file>images/general/folder-open.svg</file>
+        <file>images/general/paper-plane.svg</file>
+        <file>images/general/folder-open-blue.svg</file>
+        <file>images/general/paperclip.svg</file>
+        <file>images/general/circle-info.svg</file>
+        <file>images/general/inbox.svg</file>
     </qresource>
     <qresource prefix="/icons/authorization">
         <file>images/authorization/apple-brands.svg</file>

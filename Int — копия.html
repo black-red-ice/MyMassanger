@@ -5931,7 +5931,7 @@ window.submitTicketRequest = function(category) {
 };
 
 // =====================================================
-// OPEN WORKSPACE (кнопка закрытия на уровне "Информация")
+// OPEN WORKSPACE (кнопка закрытия на верхней панели)
 // =====================================================
 
 window.openTicketsWorkspace = function() {
@@ -5964,13 +5964,50 @@ window.openTicketsWorkspace = function() {
             display:flex;
             flex-direction:column;
             border:1px solid rgba(255,255,255,.06);
-            position:relative;
         ">
 
-            <!-- Основное содержимое (три колонки) -->
+            <!-- Верхняя плашка с заголовком и кнопкой закрытия -->
+            <div style="
+                height:80px;
+                background:#0F172A;
+                border-bottom:1px solid rgba(255,255,255,.06);
+                display:flex;
+                align-items:center;
+                justify-content:space-between;
+                padding:0 24px;
+            ">
+                <div style="
+                    color:white;
+                    font-size:20px;
+                    font-weight:700;
+                ">
+                    <i class="fas fa-folder-open" style="margin-right:12px; color:#3B82F6;"></i>
+                    Управление обращениями
+                </div>
+                <button onclick="closeModal('ticketsWorkspace')"
+                        style="
+                            width:40px;
+                            height:40px;
+                            border:none;
+                            border-radius:14px;
+                            background:#334155;
+                            color:white;
+                            cursor:pointer;
+                            transition:all 0.2s;
+                            display:flex;
+                            align-items:center;
+                            justify-content:center;
+                        "
+                        onmouseover="this.style.background='#475569'"
+                        onmouseout="this.style.background='#334155'">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <!-- Три колонки (одинаковой высоты) -->
             <div style="display:flex; flex:1; overflow:hidden;">
 
-                <!-- SIDEBAR - список обращений -->
+                <!-- КОЛОНКА 1: Список обращений -->
                 <div style="
                     width:380px;
                     background:#111827;
@@ -5979,104 +6016,127 @@ window.openTicketsWorkspace = function() {
                     flex-direction:column;
                 ">
 
+                    <!-- Заголовок колонки -->
                     <div style="
-                        padding:24px;
+                        height:80px;
+                        padding:20px 24px;
                         border-bottom:1px solid rgba(255,255,255,.06);
                     ">
-
                         <div style="
                             color:white;
-                            font-size:22px;
+                            font-size:18px;
                             font-weight:700;
-                            margin-bottom:18px;
+                            margin-bottom:8px;
                         ">
                             Мои обращения
                         </div>
-
-                        <input
-                            id="ticketsSearchInput"
-                            placeholder="Поиск обращений..."
-                            oninput="filterTicketsList()"
-                            style="
-                                width:100%;
-                                height:50px;
-                                border:none;
-                                border-radius:14px;
-                                background:#0F172A;
-                                padding:0 16px;
-                                color:white;
-                                outline:none;
-                                box-sizing:border-box;
-                            "
-                        >
-
+                        <div style="
+                            color:#94A3B8;
+                            font-size:13px;
+                        ">
+                            Список всех ваших обращений в поддержку
+                        </div>
                     </div>
 
+                    <!-- Поиск -->
+<div style="padding:16px 20px; border-bottom:1px solid rgba(255,255,255,.06);">
+    <input
+        id="ticketsSearchInput"
+        placeholder="Поиск обращений..."
+        oninput="filterTicketsList()"
+        style="
+            width:100%;
+            height:46px;
+            border:none;
+            border-radius:14px;
+            background:#1E293B;
+            padding:0 16px;
+            color:white;
+            outline:none;
+            box-sizing:border-box;
+            font-size:14px;
+        "
+        onfocus="this.style.background='#334155'"
+        onblur="this.style.background='#1E293B'"
+    >
+</div>
+
+                    <!-- Список (с прокруткой) -->
                     <div id="ticketsList"
                          style="
                             flex:1;
                             overflow:auto;
-                            padding:18px;
+                            padding:16px;
                          ">
                     </div>
 
                 </div>
 
-                <!-- CHAT - переписка -->
+                <!-- КОЛОНКА 2: Чат / переписка -->
                 <div id="ticketChat"
                      style="
                         flex:1;
                         display:flex;
-                        align-items:center;
-                        justify-content:center;
-                        color:#94A3B8;
-                        font-size:18px;
+                        flex-direction:column;
+                        background:#0F172A;
                      ">
 
-                    Выберите обращение
+                    <!-- Заголовок колонки -->
+                    <div style="
+                        height:80px;
+                        padding:20px 24px;
+                        border-bottom:1px solid rgba(255,255,255,.06);
+                    ">
+                        <div style="
+                            color:white;
+                            font-size:18px;
+                            font-weight:700;
+                            margin-bottom:8px;
+                        ">
+                            Переписка
+                        </div>
+                        <div style="
+                            color:#94A3B8;
+                            font-size:13px;
+                        ">
+                            История сообщений по обращению
+                        </div>
+                    </div>
+
+                    <!-- Контент чата -->
+                    <div id="chatContent"
+                         style="
+                            flex:1;
+                            display:flex;
+                            align-items:center;
+                            justify-content:center;
+                            color:#94A3B8;
+                            font-size:16px;
+                         ">
+                        <div style="text-align:center;">
+                            <i class="fas fa-inbox" style="font-size:48px; margin-bottom:16px; opacity:0.5;"></i><br>
+                            Выберите обращение для просмотра
+                        </div>
+                    </div>
 
                 </div>
 
-                <!-- ПРАВАЯ ПАНЕЛЬ - информация о заявке -->
+                <!-- КОЛОНКА 3: Информация о заявке -->
                 <div id="ticketInfoPanel"
                      style="
-                        width:320px;
+                        width:340px;
                         background:#111827;
                         border-left:1px solid rgba(255,255,255,.06);
                         display:flex;
                         flex-direction:column;
-                        position:relative;
                      ">
 
-                    <!-- Кнопка закрытия справа на уровне заголовка "Информация" -->
-                    <button onclick="closeModal('ticketsWorkspace')"
-                            style="
-                                position:absolute;
-                                top:28px;
-                                right:20px;
-                                width:40px;
-                                height:40px;
-                                border:none;
-                                border-radius:14px;
-                                background:#334155;
-                                color:white;
-                                cursor:pointer;
-                                z-index:100;
-                                transition:all 0.2s;
-                                display:flex;
-                                align-items:center;
-                                justify-content:center;
-                            "
-                            onmouseover="this.style.background='#475569'"
-                            onmouseout="this.style.background='#334155'">
-                        <i class="fas fa-times"></i>
-                    </button>
-
+                    <!-- Заголовок колонки (без кнопки закрытия) -->
                     <div style="
-                        padding:24px;
+                        height:80px;
+                        padding:20px 24px;
                         border-bottom:1px solid rgba(255,255,255,.06);
                     ">
-
                         <div style="
                             color:white;
                             font-size:18px;
@@ -6085,20 +6145,20 @@ window.openTicketsWorkspace = function() {
                         ">
                             Информация
                         </div>
-
                         <div style="
                             color:#94A3B8;
                             font-size:13px;
                         ">
                             Детали обращения
                         </div>
-
                     </div>
 
+                    <!-- Контент информации -->
                     <div id="ticketInfoContent"
                          style="
                             flex:1;
                             padding:20px;
+                            overflow:auto;
                          ">
 
                         <div style="
@@ -6106,8 +6166,8 @@ window.openTicketsWorkspace = function() {
                             text-align:center;
                             padding:40px 20px;
                         ">
-                            <i class="fas fa-info-circle" style="font-size:32px; margin-bottom:12px; display:block;"></i>
-                            Выберите обращение<br>для просмотра информации
+                            <i class="fas fa-info-circle" style="font-size:40px; margin-bottom:16px; display:block; opacity:0.5;"></i>
+                            Выберите обращение
                         </div>
 
                     </div>
@@ -6328,166 +6388,155 @@ function openTicketDetail(ticket) {
     }
 
     // Обновляем чат (переписку) с кнопкой прикрепления файлов
-    const chatContainer = document.getElementById('ticketChat');
-    if (chatContainer) {
-        chatContainer.innerHTML = `
+const chatContainer = document.getElementById('ticketChat');
+if (chatContainer) {
+    chatContainer.innerHTML = `
+        <div style="
+            width:100%;
+            height:100%;
+            display:flex;
+            flex-direction:column;
+        ">
+
             <div style="
-                width:100%;
-                height:100%;
-                display:flex;
-                flex-direction:column;
-            ">
+    padding:20px 24px;
+    border-bottom:1px solid rgba(255,255,255,.06);
+    min-height:80px;
+    display:flex;
+    align-items:center;
+">
+
+    <div style="
+        color:white;
+        font-size:20px;
+        font-weight:700;
+        line-height:1.3;
+    ">
+        ${ticket.subject}
+    </div>
+
+</div>
+
+            <div id="chatMessagesContainer"
+                 style="
+                    flex:1;
+                    overflow:auto;
+                    padding:24px;
+                 ">
 
                 <div style="
-                    padding:26px;
-                    border-bottom:1px solid rgba(255,255,255,.06);
                     display:flex;
-                    justify-content:space-between;
-                    align-items:center;
+                    flex-direction:column;
+                    gap:20px;
                 ">
+
+                    <div style="
+                        display:flex;
+                        justify-content:flex-end;
+                    ">
+
+                        <div style="
+                            max-width:70%;
+                            background:#2563EB;
+                            color:white;
+                            padding:18px;
+                            border-radius:18px;
+                            line-height:1.7;
+                        ">
+                            ${(ticket.message || ticket.description || 'Описание не указано').replace(/\n/g, '<br>')}
+                        </div>
+
+                    </div>
 
                     <div>
 
                         <div style="
+                            max-width:70%;
+                            background:#1E293B;
                             color:white;
-                            font-size:24px;
-                            font-weight:700;
-                            margin-bottom:8px;
+                            padding:18px;
+                            border-radius:18px;
+                            line-height:1.7;
                         ">
-                            ${ticket.subject}
-                        </div>
-
-                        <div style="
-                            color:#94A3B8;
-                            font-size:14px;
-                        ">
-                            ${ticket.category || 'Поддержка'} • ${ticket.id}
+                            Здравствуйте! Ваше обращение принято в работу. Мы свяжемся с вами в ближайшее время.
                         </div>
 
                     </div>
-
-                </div>
-
-                <div id="chatMessagesContainer"
-                     style="
-                        flex:1;
-                        overflow:auto;
-                        padding:30px;
-                     ">
-
-                    <div style="
-                        display:flex;
-                        flex-direction:column;
-                        gap:20px;
-                    ">
-
-                        <div style="
-                            display:flex;
-                            justify-content:flex-end;
-                        ">
-
-                            <div style="
-                                max-width:70%;
-                                background:#2563EB;
-                                color:white;
-                                padding:18px;
-                                border-radius:18px;
-                                line-height:1.7;
-                            ">
-                                ${(ticket.message || ticket.description || 'Описание не указано').replace(/\n/g, '<br>')}
-                            </div>
-
-                        </div>
-
-                        <div>
-
-                            <div style="
-                                max-width:70%;
-                                background:#1E293B;
-                                color:white;
-                                padding:18px;
-                                border-radius:18px;
-                                line-height:1.7;
-                            ">
-                                Здравствуйте! Ваше обращение принято в работу. Мы свяжемся с вами в ближайшее время.
-                            </div>
-
-                        </div>
-
-                    </div>
-
-                </div>
-
-                <div style="
-                    padding:22px;
-                    border-top:1px solid rgba(255,255,255,.06);
-                    display:flex;
-                    gap:14px;
-                    align-items:center;
-                ">
-
-                    <!-- Кнопка добавления файлов -->
-                    <button id="attachFileBtn"
-                            onclick="document.getElementById('fileInputForTicket').click()"
-                            style="
-                                width:48px;
-                                height:48px;
-                                border:none;
-                                border-radius:14px;
-                                background:#1E293B;
-                                color:#94A3B8;
-                                cursor:pointer;
-                                transition:all 0.2s;
-                            "
-                            onmouseover="this.style.background='#334155'; this.style.color='white'"
-                            onmouseout="this.style.background='#1E293B'; this.style.color='#94A3B8'">
-                        <i class="fas fa-paperclip"></i>
-                    </button>
-
-                    <input type="file" id="fileInputForTicket" style="display:none;" multiple onchange="attachFilesToTicket(event)">
-
-                    <textarea
-    id="replyMessageInput"
-    placeholder="Введите сообщение..."
-    style="
-        flex:1;
-        height:54px;
-        border:none;
-        border-radius:16px;
-        background:#1E293B;
-        color:white;
-        padding:16px;
-        resize:none;
-        outline:none;
-        font-family:inherit;
-        font-size:14px;
-        transition:all 0.2s;
-    "
-    onfocus="this.style.background='#334155'"
-    onblur="this.style.background='#1E293B'"
-></textarea>
-
-                    <button onclick="sendReplyToTicket('${ticket.id}')"
-                            style="
-                                width:56px;
-                                height:48px;
-                                border:none;
-                                border-radius:16px;
-                                background:#2563EB;
-                                color:white;
-                                cursor:pointer;
-                                transition:all 0.2s;
-                            "
-                            onmouseover="this.style.background='#3B82F6'"
-                            onmouseout="this.style.background='#2563EB'">
-                        <i class="fas fa-paper-plane"></i>
-                    </button>
 
                 </div>
 
             </div>
-        `;
-    }
+
+            <div style="
+                padding:22px;
+                border-top:1px solid rgba(255,255,255,.06);
+                display:flex;
+                gap:14px;
+                align-items:center;
+            ">
+
+                <!-- Кнопка добавления файлов -->
+                <button id="attachFileBtn"
+                        onclick="document.getElementById('fileInputForTicket').click()"
+                        style="
+                            width:48px;
+                            height:48px;
+                            border:none;
+                            border-radius:14px;
+                            background:#1E293B;
+                            color:#94A3B8;
+                            cursor:pointer;
+                            transition:all 0.2s;
+                        "
+                        onmouseover="this.style.background='#334155'; this.style.color='white'"
+                        onmouseout="this.style.background='#1E293B'; this.style.color='#94A3B8'">
+                    <i class="fas fa-paperclip"></i>
+                </button>
+
+                <input type="file" id="fileInputForTicket" style="display:none;" multiple onchange="attachFilesToTicket(event)">
+
+                <textarea
+                    id="replyMessageInput"
+                    placeholder="Введите сообщение..."
+                    style="
+                        flex:1;
+                        height:54px;
+                        border:none;
+                        border-radius:16px;
+                        background:#1E293B;
+                        color:white;
+                        padding:16px;
+                        resize:none;
+                        outline:none;
+                        font-family:inherit;
+                        font-size:14px;
+                        transition:all 0.2s;
+                    "
+                    onfocus="this.style.background='#334155'"
+                    onblur="this.style.background='#1E293B'"
+                ></textarea>
+
+                <button onclick="sendReplyToTicket('${ticket.id}')"
+                        style="
+                            width:56px;
+                            height:48px;
+                            border:none;
+                            border-radius:16px;
+                            background:#2563EB;
+                            color:white;
+                            cursor:pointer;
+                            transition:all 0.2s;
+                        "
+                        onmouseover="this.style.background='#3B82F6'"
+                        onmouseout="this.style.background='#2563EB'">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+
+            </div>
+
+        </div>
+    `;
+}
 }
 
 // =====================================================
