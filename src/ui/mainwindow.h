@@ -226,6 +226,9 @@ private:
     QString m_pendingPassword;
     QString m_confirmationCode;
     SupportDialog *m_supportDialog = nullptr;
+    void updateChatLastTime(int chatId, const QString &lastTime);
+    void bumpChatToTop(int chatId);
+    void updateLastMessageInChat(int chatId, const QString &lastMessage, const QString &lastTime = QString());
 };
 
 #endif // MAINWINDOW_H

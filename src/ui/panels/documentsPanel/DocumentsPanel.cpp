@@ -235,7 +235,6 @@ bool DocumentsPanel::eventFilter(QObject *obj, QEvent *event)
     }
     return SidePanel::eventFilter(obj, event);
 }
-
 void DocumentsPanel::onDocumentClicked(const QString &docId)
 {
     // Найти документ по id
@@ -322,8 +321,9 @@ QWidget* DocumentsPanel::createDocumentCard(const Document &doc)
 
     card->setProperty("docId", doc.id);
     card->setProperty("docName", doc.name);
-    card->setProperty("fileUrl", doc.fileUrl);
+    card->setProperty("fileUrl", doc.fileUrl);  // 🔥 ДОБАВИТЬ
     nameLabel->setProperty("docId", doc.id);
+    nameLabel->setProperty("fileUrl", doc.fileUrl);  // 🔥 ДОБАВИТЬ
     metaLabel->setProperty("docId", doc.id);
     iconContainer->setProperty("docId", doc.id);
     docIcon->setProperty("docId", doc.id);

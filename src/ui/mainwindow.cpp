@@ -272,10 +272,22 @@ void MainWindow::setupUI()
 
         qDebug() << "📎 FILE ATTACHED:" << filePath << "isImage:" << isImage;
 
+        // 🔥 ОБНОВИТЬ ПОСЛЕДНЕЕ СООБЩЕНИЕ В СПИСКЕ ЧАТОВ
+        QString displayText;
+        if (isImage) {
+            displayText = "🖼 Изображение";
+        } else {
+            displayText = "📎 " + fi.fileName();
+        }
+        updateLastMessageInChat(m_currentChatId, displayText);
+
+        // 🔥 ПОДНЯТЬ ЧАТ НАВЕРХ
+        bumpChatToTop(m_currentChatId);
+
         if (isImage) {
             m_rightPanel->addImageMessage(filePath, true, 1);
 
-            // 🔥 СОЗДАЁМ НОВЫЙ QNetworkAccessManager ДЛЯ КАЖДОГО ЗАПРОСА
+            // СОЗДАЁМ НОВЫЙ QNetworkAccessManager ДЛЯ КАЖДОГО ЗАПРОСА
             QNetworkAccessManager *uploadManager = new QNetworkAccessManager(this);
             uploadManager->setProxy(QNetworkProxy::NoProxy);
 
@@ -318,7 +330,7 @@ void MainWindow::setupUI()
 
                         QString clientId = QUuid::createUuid().toString(QUuid::WithoutBraces);
 
-                        // 🔥 ДОБАВЛЯЕМ ЛОКАЛЬНОЕ СООБЩЕНИЕ
+                        // ДОБАВЛЯЕМ ЛОКАЛЬНОЕ СООБЩЕНИЕ
                         Message msg;
                         msg.id = -1;
                         msg.chatId = m_currentChatId;
@@ -391,7 +403,7 @@ void MainWindow::setupUI()
 
                         QString clientId = QUuid::createUuid().toString(QUuid::WithoutBraces);
 
-                        // 🔥 ДОБАВЛЯЕМ ЛОКАЛЬНОЕ СООБЩЕНИЕ
+                        // ДОБАВЛЯЕМ ЛОКАЛЬНОЕ СООБЩЕНИЕ
                         Message msg;
                         msg.id = -1;
                         msg.chatId = m_currentChatId;
@@ -1518,9 +1530,6 @@ void MainWindow::onJson(const QJsonObject& obj)
                 m_userToChat[otherUserId] = chatId;
             }
 
-            sortChats();
-            m_middlePanel->setChats(m_chats);
-
             m_chats.append(chat);
 
             if (otherUserId > 0) {
@@ -1528,6 +1537,8 @@ void MainWindow::onJson(const QJsonObject& obj)
             }
         }
 
+        // 🔥 СОРТИРУЕМ ЧАТЫ ПЕРЕД ОТОБРАЖЕНИЕМ
+        sortChats();
         m_middlePanel->setChats(m_chats);
         updateChatAvatars();
 
@@ -1545,6 +1556,23 @@ void MainWindow::onJson(const QJsonObject& obj)
             return;
 
         QJsonArray arr = data["messages"].toArray();
+
+        // Если есть сообщения, обновить last_time самого свежего
+        if (!arr.isEmpty()) {
+            QJsonObject newestMsg = arr.first().toObject(); // Сервер присылает DESC
+            QString newestTime = newestMsg["time"].toString();
+
+            for (QVariantMap &chat : m_chats) {
+                if (chat["id"].toInt() == chatId) {
+                    chat["last_time"] = newestTime;
+                    break;
+                }
+            }
+
+            // Пересортировать чаты
+            sortChats();
+            m_middlePanel->setChats(m_chats);
+        }
 
         auto &messages = m_chatMessages[chatId];
         QVector<Message> newMessages;
@@ -1672,26 +1700,50 @@ void MainWindow::onJson(const QJsonObject& obj)
     else if (type == "new_message") {
         int chatId = data["chat_id"].toInt();
         QString clientId = data["client_id"].toString();
+        int senderId = data["sender_id"].toInt();
+        QString messageText = data["text"].toString();
+        QString messageTime = data["time"].toString();
+        int messageStatus = data["status"].toInt();
 
         qDebug() << "📥 NEW MESSAGE received:"
                  << "chatId:" << chatId
                  << "clientId:" << clientId
-                 << "senderId:" << data["sender_id"].toInt()
-                 << "status:" << data["status"].toInt()
-                 << "text:" << data["text"].toString().left(50);
+                 << "senderId:" << senderId
+                 << "status:" << messageStatus
+                 << "text:" << messageText.left(50);
+
+        // 🔥 ПОДНЯТЬ ЧАТ НАВЕРХ (если сообщение не от меня)
+        if (senderId != m_currentUserId) {
+            bumpChatToTop(chatId);
+        }
+
+        // 🔥 ОБНОВИТЬ ПОСЛЕДНЕЕ СООБЩЕНИЕ В СПИСКЕ ЧАТОВ
+        QString displayText = messageText;
+        if (messageText.startsWith("🖼 ")) {
+            displayText = "🖼 Изображение";
+        } else if (messageText.startsWith("📎 ")) {
+            // Для файлов показываем имя файла
+            QStringList parts = messageText.mid(2).split("|");
+            if (parts.size() >= 1) {
+                displayText = "📎 " + parts[0].trimmed();
+            } else {
+                displayText = "📎 Файл";
+            }
+        }
+        updateLastMessageInChat(chatId, displayText, messageTime);
 
         Message msg;
         msg.id = data["id"].toInt();
         msg.chatId = chatId;
-        msg.senderId = data["sender_id"].toInt();
-        msg.text = data["text"].toString();
-        msg.time = data["time"].toString();
+        msg.senderId = senderId;
+        msg.text = messageText;
+        msg.time = messageTime;
         msg.clientId = clientId;
-        msg.status = static_cast<MessageStatus>(data["status"].toInt());
+        msg.status = static_cast<MessageStatus>(messageStatus);
 
         auto &messages = m_chatMessages[chatId];
 
-        // 🔥 Ищем сообщение с таким же client_id
+        // Ищем сообщение с таким же client_id
         bool matchedClient = false;
         if (!clientId.isEmpty()) {
             for (Message &existing : messages) {
@@ -1732,15 +1784,34 @@ void MainWindow::onJson(const QJsonObject& obj)
             }
         }
 
+        // Отправляем подтверждение доставки
         if (msg.senderId != m_currentUserId && msg.id > 0 && msg.status < MessageStatus::Delivered) {
             qDebug() << "📩 Sending delivered ACK for msg:" << msg.id;
             sendDeliveredAck(chatId, msg.id);
         }
 
+        // Отправляем прочитано, если чат открыт
         if (chatId == m_currentChatId && msg.senderId != m_currentUserId && msg.id > m_lastReadSent.value(chatId, 0)) {
             qDebug() << "📖 Sending read receipt for chat:" << chatId;
             sendReadReceipt(chatId);
             m_lastReadSent[chatId] = qMax(m_lastReadSent.value(chatId, 0), msg.id);
+        }
+
+        // Обновляем счётчик непрочитанных в списке чатов
+        if (chatId != m_currentChatId && senderId != m_currentUserId) {
+            m_unreadCount[chatId] = m_unreadCount.value(chatId, 0) + 1;
+
+            // Обновляем unread в m_chats
+            for (QVariantMap &chat : m_chats) {
+                if (chat["id"].toInt() == chatId) {
+                    chat["unread"] = m_unreadCount[chatId];
+                    break;
+                }
+            }
+
+            // Обновляем отображение списка чатов
+            m_middlePanel->setChats(m_chats);
+            updateChatAvatars();
         }
     }
     else if (type == "delivered") {
@@ -2307,8 +2378,6 @@ void MainWindow::onNewMessage(const QJsonObject &msg)
 void MainWindow::onSendMessage(const QString &text)
 {
     qDebug() << "=== onSendMessage ===";
-    qDebug() << "text:" << text;
-    qDebug() << "networkManager:" << networkManager;
 
     if (!networkManager || !networkManager->isConnected()) {
         qDebug() << "❌ Not connected";
@@ -2316,9 +2385,15 @@ void MainWindow::onSendMessage(const QString &text)
     }
 
     if (m_currentChatId == 0) {
-        qDebug() << "❌ No chat selected, m_currentChatId:" << m_currentChatId;
+        qDebug() << "❌ No chat selected";
         return;
     }
+
+    // 🔥 ПОДНЯТЬ ЧАТ НАВЕРХ
+    bumpChatToTop(m_currentChatId);
+
+    // 🔥 ОБНОВИТЬ ПОСЛЕДНЕЕ СООБЩЕНИЕ
+    updateLastMessageInChat(m_currentChatId, text);
 
     QString clientId = QUuid::createUuid().toString(QUuid::WithoutBraces);
 
@@ -2327,9 +2402,6 @@ void MainWindow::onSendMessage(const QString &text)
     data["sender_id"] = m_currentUserId;
     data["content"] = text;
     data["client_id"] = clientId;
-
-    qDebug() << "Sending message to chat:" << m_currentChatId;
-    qDebug() << "Data:" << data;
 
     networkManager->sendJson("send_message", data);
 
@@ -2694,18 +2766,31 @@ void MainWindow::uploadFileHttp(const QString &filePath,
 void MainWindow::downloadFileHttp(const QString &fileUrl, const QString &savePath)
 {
     QString fullUrl = fileUrl.startsWith("/files/")
-    ? QString(API_SERVER) + fileUrl  // ← ИСПОЛЬЗУЕМ API_SERVER
+    ? QString(API_SERVER) + fileUrl
     : fileUrl;
 
-    QNetworkReply *reply = m_httpManager->get(QNetworkRequest(QUrl(fullUrl)));
+    qDebug() << "📥 Downloading file from:" << fullUrl;
+    qDebug() << "📥 Saving to:" << savePath;
 
-    connect(reply, &QNetworkReply::finished, this, [reply, savePath]() {
+    QUrl url(fullUrl);
+    QNetworkRequest request(url);
+    QNetworkReply *reply = m_httpManager->get(request);
+
+    connect(reply, &QNetworkReply::finished, this, [reply, savePath, this]() {
         if (reply->error() == QNetworkReply::NoError) {
             QFile file(savePath);
             if (file.open(QIODevice::WriteOnly)) {
                 file.write(reply->readAll());
                 file.close();
+                qDebug() << "✅ File saved successfully to:" << savePath;
+                QMessageBox::information(this, "Успех", "Файл успешно сохранён!");
+            } else {
+                qDebug() << "❌ Cannot open file for writing:" << savePath;
+                QMessageBox::warning(this, "Ошибка", "Не удалось сохранить файл: " + savePath);
             }
+        } else {
+            qDebug() << "❌ Download error:" << reply->errorString();
+            QMessageBox::warning(this, "Ошибка", "Не удалось скачать файл: " + reply->errorString());
         }
         reply->deleteLater();
     });
@@ -2945,8 +3030,17 @@ void MainWindow::togglePinChat(int chatId)
 
     // Пересортировать чаты
     sortChats();
+
+    // Обновить MiddlePanel с отсортированными чатами
     m_middlePanel->setChats(m_chats);
+
+    // Обновить аватары (чтобы не пропали)
     updateChatAvatars();
+
+    // Обновить состояние кнопки закрепления в RightPanel
+    if (m_rightPanel) {
+        m_rightPanel->setPinned(m_pinnedChats.contains(chatId));
+    }
 }
 
 void MainWindow::savePinnedChats()
@@ -2966,19 +3060,37 @@ void MainWindow::loadPinnedChats()
     for (const QString &s : pinned) {
         m_pinnedChats.insert(s.toInt());
     }
+
+    // Если чаты уже загружены, пересортировать
+    if (!m_chats.isEmpty()) {
+        sortChats();
+        if (m_middlePanel) {
+            m_middlePanel->setChats(m_chats);
+        }
+    }
 }
 
 void MainWindow::sortChats()
 {
-    // Закрепленные чаты в начало
     std::sort(m_chats.begin(), m_chats.end(), [this](const QVariantMap &a, const QVariantMap &b) {
         int aId = a["id"].toInt();
         int bId = b["id"].toInt();
         bool aPinned = m_pinnedChats.contains(aId);
         bool bPinned = m_pinnedChats.contains(bId);
+
+        // Закреплённые всегда выше
         if (aPinned && !bPinned) return true;
         if (!aPinned && bPinned) return false;
-        return aId > bId; // По ID для стабильности
+
+        // Сортировка по времени последнего сообщения (новые сверху)
+        QString aTime = a["last_time"].toString();
+        QString bTime = b["last_time"].toString();
+
+        // Пустые строки (чаты без сообщений) отправляем вниз
+        if (aTime.isEmpty() && !bTime.isEmpty()) return false;
+        if (!aTime.isEmpty() && bTime.isEmpty()) return true;
+
+        return aTime > bTime; // Более новые сверху
     });
 }
 
@@ -3057,4 +3169,73 @@ void MainWindow::clearAvatarCache()
         }
         qDebug() << "Avatar cache cleared, removed" << files.size() << "files";
     }
+}
+
+void MainWindow::updateChatLastTime(int chatId, const QString &lastTime)
+{
+    for (QVariantMap &chat : m_chats) {
+        if (chat["id"].toInt() == chatId) {
+            chat["last_time"] = lastTime;
+            break;
+        }
+    }
+}
+
+void MainWindow::bumpChatToTop(int chatId)
+{
+    // Находим чат и обновляем его время на текущее
+    QString currentTime = QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss");
+
+    for (QVariantMap &chat : m_chats) {
+        if (chat["id"].toInt() == chatId) {
+            chat["last_time"] = currentTime;
+            break;
+        }
+    }
+
+    // Пересортировать чаты
+    sortChats();
+
+    // Обновить отображение
+    m_middlePanel->setChats(m_chats);
+    updateChatAvatars();
+}
+
+void MainWindow::updateLastMessageInChat(int chatId, const QString &lastMessage, const QString &lastTime)
+{
+    for (QVariantMap &chat : m_chats) {
+        if (chat["id"].toInt() == chatId) {
+            // Форматируем последнее сообщение
+            QString formattedMessage = lastMessage;
+
+            // Заменяем переносы строк на пробелы
+            formattedMessage.replace('\n', ' ');
+
+            // Ограничиваем длину
+            if (formattedMessage.length() > 50) {
+                formattedMessage = formattedMessage.left(47) + "...";
+            }
+
+            chat["last_message"] = formattedMessage;
+
+            // Обновляем время
+            QString timeToUse = lastTime;
+            if (timeToUse.isEmpty()) {
+                timeToUse = QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss");
+            }
+            chat["last_time"] = timeToUse;
+
+            qDebug() << "📝 Updated chat" << chatId
+                     << "last_message:" << formattedMessage
+                     << "last_time:" << timeToUse;
+            break;
+        }
+    }
+
+    // Пересортировка с учётом нового времени
+    sortChats();
+
+    // Обновляем UI
+    m_middlePanel->setChats(m_chats);
+    updateChatAvatars();
 }
