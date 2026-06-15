@@ -32,4 +32,5 @@ private:
     QComboBox *m_eventType;
     QLineEdit *m_participants;
     QString m_selectedColor;
+    void setupDateTimeEdit();
 };

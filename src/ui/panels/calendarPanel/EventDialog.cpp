@@ -8,9 +8,12 @@
 #include <QComboBox>
 #include <QPushButton>
 #include <QKeyEvent>
+#include <QCalendarWidget>
+#include <QTableView>
+#include <QHeaderView>
 
 EventDialog::EventDialog(QWidget *parent)
-    : OverlayDialog(parent), m_selectedColor("#1d4ed8")
+    : OverlayDialog(parent), m_selectedColor("#059669")
 {
     setFixedSize(540, 760);
     setStyleSheet("background: transparent;");
@@ -32,8 +35,7 @@ EventDialog::EventDialog(QWidget *parent)
     // Заголовок
     QWidget *header = new QWidget();
     header->setStyleSheet(
-        "background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #1d4ed8, stop:1 #2563eb);"
-        "border-top-left-radius: 18px; border-top-right-radius: 18px;"
+        "background: #059669; border-top-left-radius: 18px; border-top-right-radius: 18px;"
         );
     header->setFixedHeight(60);
     QHBoxLayout *headerLayout = new QHBoxLayout(header);
@@ -69,7 +71,153 @@ EventDialog::EventDialog(QWidget *parent)
         "  color: #f1f5f9; padding: 12px 16px; font-size: 14px;"
         "}"
         "QLineEdit:focus, QTextEdit:focus, QDateTimeEdit:focus, QComboBox:focus {"
-        "  border-color: #1d4ed8;"
+        "  border-color: #059669; outline: none;"
+        "}"
+        // Убираем пунктирную рамку
+        "QComboBox:focus, QDateTimeEdit:focus {"
+        "  outline: none;"
+        "}"
+        "QComboBox::item:focus, QDateTimeEdit::item:focus {"
+        "  outline: none;"
+        "}"
+        "QComboBox QAbstractItemView::item:focus {"
+        "  outline: none;"
+        "  border: none;"
+        "}"
+        "QComboBox::drop-down:focus {"
+        "  outline: none;"
+        "}"
+        // QComboBox стили
+        "QComboBox::drop-down {"
+        "  border: none;"
+        "  width: 30px;"
+        "  border-top-right-radius: 10px;"
+        "  border-bottom-right-radius: 10px;"
+        "}"
+        "QComboBox::down-arrow {"
+        "  image: none;"
+        "  border-left: 5px solid transparent;"
+        "  border-right: 5px solid transparent;"
+        "  border-top: 6px solid #f1f5f9;"
+        "  margin-right: 10px;"
+        "}"
+        "QComboBox QAbstractItemView {"
+        "  background: #0f172a;"
+        "  color: #f1f5f9;"
+        "  border: 1px solid #334155;"
+        "  border-radius: 10px;"
+        "  selection-background-color: #334155;"
+        "  outline: none;"
+        "}"
+        "QComboBox QAbstractItemView::item {"
+        "  padding: 8px 12px;"
+        "  color: #f1f5f9;"
+        "}"
+        "QComboBox QAbstractItemView::item:selected {"
+        "  background: #334155;"
+        "  outline: none;"
+        "}"
+        // QDateTimeEdit стили
+        "QDateTimeEdit::drop-down {"
+        "  border: none;"
+        "  width: 30px;"
+        "  border-top-right-radius: 10px;"
+        "  border-bottom-right-radius: 10px;"
+        "}"
+        "QDateTimeEdit::down-arrow {"
+        "  image: none;"
+        "  border-left: 5px solid transparent;"
+        "  border-right: 5px solid transparent;"
+        "  border-top: 6px solid #f1f5f9;"
+        "  margin-right: 10px;"
+        "}"
+        // Календарь для QDateTimeEdit
+        "QDateTimeEdit QCalendarWidget {"
+        "  background: #1e293b;"
+        "  color: #f1f5f9;"
+        "  border: none;"
+        "}"
+        "QDateTimeEdit QCalendarWidget QWidget#qt_calendar_navigationbar {"
+        "  background: #1e293b;"
+        "  border-bottom: 1px solid #334155;"
+        "  padding: 8px;"
+        "}"
+        "QDateTimeEdit QCalendarWidget QToolButton {"
+        "  color: #f1f5f9;"
+        "  background: transparent;"
+        "  border: none;"
+        "  border-radius: 8px;"
+        "  padding: 6px 12px;"
+        "  font-size: 14px;"
+        "  font-weight: 600;"
+        "}"
+        "QDateTimeEdit QCalendarWidget QToolButton:hover {"
+        "  background: #334155;"
+        "}"
+        "QDateTimeEdit QCalendarWidget QToolButton::menu-indicator {"
+        "  image: none;"
+        "}"
+        "QDateTimeEdit QCalendarWidget QSpinBox {"
+        "  background: #334155;"
+        "  border: none;"
+        "  border-radius: 8px;"
+        "  color: #f1f5f9;"
+        "  padding: 4px 8px;"
+        "  font-size: 14px;"
+        "}"
+        "QDateTimeEdit QCalendarWidget QTableView {"
+        "  background: #1e293b;"
+        "  selection-background-color: transparent;"
+        "  border: none;"
+        "  gridline-color: transparent;"
+        "}"
+        "QDateTimeEdit QCalendarWidget QTableView::item {"
+        "  background: transparent;"
+        "  border: none;"
+        "  color: #cbd5e1;"
+        "  padding: 8px 4px;"
+        "  border-radius: 0px;"
+        "  min-width: 32px;"
+        "}"
+        "QDateTimeEdit QCalendarWidget QTableView::item:selected {"
+        "  background: #334155;"
+        "  border-radius: 12px;"
+        "  color: white;"
+        "}"
+        "QDateTimeEdit QCalendarWidget QTableView::item:hover {"
+        "  background: #2d3a4e;"
+        "  border-radius: 12px;"
+        "}"
+        // Убираем пунктирную рамку
+        "QDateTimeEdit QCalendarWidget QTableView::item:focus {"
+        "  outline: none;"
+        "  border: none;"
+        "}"
+        "QDateTimeEdit QCalendarWidget QTableView::item:selected:focus {"
+        "  outline: none;"
+        "  border: none;"
+        "}"
+        "QDateTimeEdit QCalendarWidget:focus {"
+        "  outline: none;"
+        "}"
+        // Дни недели
+        "QDateTimeEdit QCalendarWidget QHeaderView::section {"
+        "  background: #1e293b;"
+        "  border: none;"
+        "  color: #64748B;"
+        "  padding: 8px 2px;"
+        "  font-weight: 500;"
+        "  min-width: 40px;"
+        "  width: 40px;"
+        "  text-align: center;"
+        "}"
+        // Скрываем вертикальный заголовок
+        "QDateTimeEdit QCalendarWidget QTableView QHeaderView::section:vertical {"
+        "  width: 20px;"
+        "  min-width: 20px;"
+        "  background: #1e293b;"
+        "  color: #64748B;"
+        "  border: none;"
         "}";
 
     auto addLabel = [&](const QString &text) {
@@ -98,6 +246,7 @@ EventDialog::EventDialog(QWidget *parent)
     m_dateTime->setCalendarPopup(true);
     m_dateTime->setStyleSheet(inputStyle);
     m_dateTime->setFixedHeight(44);
+    setupDateTimeEdit();  // Настройка календаря
     dateCol->addWidget(m_dateTime);
     dateRow->addLayout(dateCol, 1);
 
@@ -128,7 +277,7 @@ EventDialog::EventDialog(QWidget *parent)
     QHBoxLayout *colorRow = new QHBoxLayout();
     colorRow->setSpacing(8);
 
-    QStringList colors = {"#1d4ed8", "#10B981", "#8B5CF6", "#0EA5E9", "#F59E0B"};
+    QStringList colors = {"#1d4ed8", "#10B981", "#8B5CF6", "#0EA5E9", "#F59E0B", "#EF4444", "#EC4899"};
     for (const QString &color : colors) {
         QPushButton *colorBtn = new QPushButton();
         colorBtn->setFixedSize(30, 30);
@@ -146,7 +295,9 @@ EventDialog::EventDialog(QWidget *parent)
                     QString c = b->styleSheet().contains("#1d4ed8") ? "#1d4ed8" :
                                     b->styleSheet().contains("#10B981") ? "#10B981" :
                                     b->styleSheet().contains("#8B5CF6") ? "#8B5CF6" :
-                                    b->styleSheet().contains("#0EA5E9") ? "#0EA5E9" : "#F59E0B";
+                                    b->styleSheet().contains("#0EA5E9") ? "#0EA5E9" :
+                                    b->styleSheet().contains("#F59E0B") ? "#F59E0B" :
+                                    b->styleSheet().contains("#EF4444") ? "#EF4444" : "#EC4899";
                     b->setStyleSheet(
                         QString("QPushButton { background: %1; border-radius: 15px; border: 2px solid %2; }")
                             .arg(c, c == color ? "white" : "transparent")
@@ -194,8 +345,8 @@ EventDialog::EventDialog(QWidget *parent)
     saveBtn->setFixedHeight(44);
     saveBtn->setCursor(Qt::PointingHandCursor);
     saveBtn->setStyleSheet(
-        "QPushButton { background: #1d4ed8; border: none; border-radius: 10px; color: white; font-size: 14px; font-weight: 600; }"
-        "QPushButton:hover { background: #2563eb; }"
+        "QPushButton { background: #059669; border: none; border-radius: 10px; color: white; font-size: 14px; font-weight: 600; }"
+        "QPushButton:hover { background: #047857; }"
         );
     connect(saveBtn, &QPushButton::clicked, this, [this]() {
         accept();
@@ -210,6 +361,112 @@ EventDialog::EventDialog(QWidget *parent)
     cancelBtn->setAutoDefault(false);
 
     containerLayout->addWidget(content);
+}
+
+void EventDialog::setupDateTimeEdit()
+{
+    QCalendarWidget *calendar = m_dateTime->calendarWidget();
+    if (!calendar) return;
+
+    // Устанавливаем фиксированный меньший размер
+    calendar->setFixedSize(320, 260);
+
+    calendar->setGridVisible(false);
+    calendar->setVerticalHeaderFormat(QCalendarWidget::NoVerticalHeader);
+    calendar->setHorizontalHeaderFormat(QCalendarWidget::ShortDayNames);  // Короткие названия дней (Пн, Вт, Ср)
+
+    QPalette pal = calendar->palette();
+    pal.setColor(QPalette::Highlight, Qt::transparent);
+    pal.setColor(QPalette::HighlightedText, Qt::white);
+    calendar->setPalette(pal);
+
+    calendar->setStyleSheet(
+        "QCalendarWidget {"
+        "  background: #1e293b;"
+        "  border: none;"
+        "}"
+        "QCalendarWidget QToolButton {"
+        "  color: #f1f5f9;"
+        "  background: transparent;"
+        "  border: none;"
+        "  border-radius: 8px;"
+        "  padding: 4px 8px;"
+        "  font-size: 12px;"
+        "  font-weight: 600;"
+        "}"
+        "QCalendarWidget QToolButton:hover {"
+        "  background: #334155;"
+        "}"
+        "QCalendarWidget QToolButton::menu-indicator {"
+        "  image: none;"
+        "}"
+        "QCalendarWidget QWidget#qt_calendar_navigationbar {"
+        "  background: #1e293b;"
+        "  border-bottom: 1px solid #334155;"
+        "  padding: 4px;"
+        "}"
+        "QCalendarWidget QSpinBox {"
+        "  background: #334155;"
+        "  border: none;"
+        "  border-radius: 6px;"
+        "  color: #f1f5f9;"
+        "  padding: 2px 6px;"
+        "  font-size: 12px;"
+        "}"
+        "QCalendarWidget QTableView {"
+        "  background: #1e293b;"
+        "  border: none;"
+        "}"
+        "QCalendarWidget QTableView::item {"
+        "  background: transparent;"
+        "  border: none;"
+        "  color: #cbd5e1;"
+        "  padding: 6px 4px;"
+        "  font-size: 12px;"
+        "}"
+        "QCalendarWidget QTableView::item:selected {"
+        "  background: #334155;"
+        "  border-radius: 10px;"
+        "  color: white;"
+        "}"
+        "QCalendarWidget QTableView::item:selected:focus {"
+        "  background: #334155;"
+        "  border-radius: 10px;"
+        "  color: white;"
+        "  outline: none;"
+        "}"
+        "QCalendarWidget QTableView::item:focus {"
+        "  outline: none;"
+        "}"
+        "QCalendarWidget QHeaderView::section {"
+        "  background: #1e293b;"
+        "  border: none;"
+        "  color: #64748B;"
+        "  padding: 4px 2px;"
+        "  font-weight: 500;"
+        "  font-size: 11px;"
+        "  min-width: 28px;"
+        "}"
+        );
+
+    QTableView *tableView = calendar->findChild<QTableView*>();
+    if (tableView) {
+        tableView->setFocusPolicy(Qt::NoFocus);
+        tableView->setSelectionMode(QAbstractItemView::SingleSelection);
+        tableView->setSelectionBehavior(QAbstractItemView::SelectItems);
+        tableView->setStyleSheet(
+            "QTableView {"
+            "  outline: none;"
+            "  border: none;"
+            "}"
+            "QTableView::item:focus {"
+            "  outline: none;"
+            "  border: none;"
+            "}"
+            );
+    }
+
+    calendar->setFocusPolicy(Qt::ClickFocus);
 }
 
 void EventDialog::keyPressEvent(QKeyEvent *event)
