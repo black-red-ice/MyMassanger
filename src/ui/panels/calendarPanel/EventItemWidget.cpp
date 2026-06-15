@@ -111,7 +111,9 @@ EventItemWidget::EventItemWidget(const CalendarEvent &event, QWidget *parent)
         );
     m_typeLabel->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Minimum);
     m_typeLabel->setAlignment(Qt::AlignCenter);
-    m_typeLabel->adjustSize(); // подгоняем размер под текст
+    m_typeLabel->setMinimumHeight(22);  // ← фиксируем минимальную высоту
+    m_typeLabel->setMaximumHeight(22);  // ← фиксируем максимальную высоту
+    m_typeLabel->adjustSize();
     infoLayout->addWidget(m_typeLabel, 0, Qt::AlignLeft);
 
     main->addWidget(textContainer, 1);
@@ -149,8 +151,14 @@ EventItemWidget::EventItemWidget(const CalendarEvent &event, QWidget *parent)
 
 void EventItemWidget::updateHeight()
 {
-    // Вычисляем высоту только на основе существующих виджетов
-    int totalHeight = 16; // отступы карточки
+    // Принудительно обновляем размер бейджа
+    if (m_typeLabel) {
+        m_typeLabel->adjustSize();
+        m_typeLabel->updateGeometry();
+    }
+
+    // Вычисляем высоту
+    int totalHeight = 16;
 
     totalHeight += m_titleLabel->document()->size().height();
     if (m_descriptionLabel) {
@@ -162,7 +170,6 @@ void EventItemWidget::updateHeight()
     }
     totalHeight += m_typeLabel->height() + 2;
 
-    // Убеждаемся, что кнопка помещается
     if (totalHeight < 40) totalHeight = 40;
 
     if (totalHeight > 20 && totalHeight != height()) {

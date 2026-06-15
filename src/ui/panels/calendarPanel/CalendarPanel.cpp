@@ -269,6 +269,19 @@ void CalendarPanel::onEventClicked(const CalendarEvent &event)
         event.participants,
         dimWidget
         );
+
+    // Подключаем сигнал редактирования
+    connect(&dialog, &EventDetailDialog::editRequested, this, [this, event, dimWidget]() {
+        // Закрываем текущий диалог
+        dimWidget->deleteLater();
+
+        // Открываем диалог редактирования (нужно создать EditEventDialog или использовать EventDialog с предзаполненными данными)
+        // Пока просто выведем сообщение, позже реализуем полноценное редактирование
+        QMessageBox::information(this, "Редактирование", "Функция редактирования событий будет добавлена в следующей версии.");
+
+        // TODO: Создать диалог редактирования события
+    });
+
     dialog.exec();
 
     dimWidget->deleteLater();

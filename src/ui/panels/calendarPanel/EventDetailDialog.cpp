@@ -12,7 +12,14 @@ EventDetailDialog::EventDetailDialog(const QString &title,
                                      const QString &color,
                                      const QString &participants,
                                      QWidget *parent)
-    : OverlayDialog(parent)
+    : OverlayDialog(parent),
+    m_title(title),
+    m_description(description),
+    m_dateTime(dateTime),
+    m_duration(duration),
+    m_eventType(eventType),
+    m_color(color),
+    m_participants(participants)
 {
     setFixedSize(540, 560);
     setStyleSheet("background: transparent;");
@@ -84,7 +91,11 @@ EventDetailDialog::EventDetailDialog(const QString &title,
 
     contentLayout->addStretch();
 
-    // Кнопка закрыть
+    // Кнопки в горизонтальном ряду
+    QHBoxLayout *buttonLayout = new QHBoxLayout();
+    buttonLayout->setSpacing(12);
+
+    // Кнопка "Закрыть" (теперь первая)
     QPushButton *closeButton = new QPushButton("Закрыть");
     closeButton->setFixedHeight(44);
     closeButton->setCursor(Qt::PointingHandCursor);
@@ -93,7 +104,26 @@ EventDetailDialog::EventDetailDialog(const QString &title,
         "QPushButton:hover { background: #475569; }"
         );
     connect(closeButton, &QPushButton::clicked, this, &QDialog::reject);
-    contentLayout->addWidget(closeButton);
+
+    // Кнопка "Редактировать" (теперь вторая)
+    QPushButton *editBtn = new QPushButton("Редактировать");
+    editBtn->setFixedHeight(44);
+    editBtn->setCursor(Qt::PointingHandCursor);
+    editBtn->setStyleSheet(
+        "QPushButton { background: #059669; border: none; border-radius: 10px; color: white; font-size: 14px; font-weight: 600; }"
+        "QPushButton:hover { background: #047857; }"
+        );
+    connect(editBtn, &QPushButton::clicked, this, &EventDetailDialog::onEditClicked);
+
+    buttonLayout->addWidget(closeButton);
+    buttonLayout->addWidget(editBtn);
+    contentLayout->addLayout(buttonLayout);
 
     containerLayout->addWidget(content);
+}
+
+void EventDetailDialog::onEditClicked()
+{
+    emit editRequested();
+    accept();  // Закрываем диалог деталей перед открытием диалога редактирования
 }
