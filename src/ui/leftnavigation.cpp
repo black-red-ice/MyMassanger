@@ -32,7 +32,7 @@ void LeftNavigation::setupUI()
     // Кнопки
     m_btnChat = new QPushButton();
     m_btnEmployees = new QPushButton();
-    m_btnProjects = new QPushButton();
+    //m_btnProjects = new QPushButton();
 
     // Секция "РАБОТА"
     QLabel *workLabel = new QLabel("РАБОТА");
@@ -62,7 +62,7 @@ void LeftNavigation::setupUI()
     // Иконки
     addNavButton(m_btnChat, ":/icons/darkTheme/images/darkTheme/comments-solid-full.svg");
     addNavButton(m_btnEmployees, ":/icons/darkTheme/images/darkTheme/users.svg");
-    addNavButton(m_btnProjects, ":/icons/darkTheme/images/darkTheme/diagram-project.svg");
+    //addNavButton(m_btnProjects, ":/icons/darkTheme/images/darkTheme/diagram-project.svg");
     addNavButton(m_btnTasks, ":/icons/darkTheme/images/darkTheme/list-check.svg");
     addNavButton(m_btnCalendar, ":/icons/darkTheme/images/darkTheme/calendar.svg");
     addNavButton(m_btnDocs, ":/icons/darkTheme/images/darkTheme/folder.svg");
@@ -74,7 +74,7 @@ void LeftNavigation::setupUI()
     // Соединения
     connect(m_btnChat, &QPushButton::clicked, this, &LeftNavigation::onChatClicked);
     connect(m_btnEmployees, &QPushButton::clicked, this, &LeftNavigation::onEmployeesClicked);
-    connect(m_btnProjects, &QPushButton::clicked, this, &LeftNavigation::onProjectsClicked);
+    //connect(m_btnProjects, &QPushButton::clicked, this, &LeftNavigation::onProjectsClicked);
     connect(m_btnTasks, &QPushButton::clicked, this, &LeftNavigation::onTasksClicked);
     connect(m_btnCalendar, &QPushButton::clicked, this, &LeftNavigation::onCalendarClicked);
     connect(m_btnDocs, &QPushButton::clicked, this, &LeftNavigation::onDocsClicked);
@@ -257,7 +257,7 @@ void LeftNavigation::onProfileClicked()
 
 void LeftNavigation::resetOtherButtons(QPushButton *activeBtn)
 {
-    QList<QPushButton*> all = {m_btnChat, m_btnEmployees, m_btnProjects, m_btnTasks,
+    QList<QPushButton*> all = {m_btnChat, m_btnEmployees, /*m_btnProjects,*/ m_btnTasks,
                                 m_btnCalendar, m_btnDocs, m_btnCrmClients,
                                 m_btnCrmCompanies, m_btnSettings, m_btnSupport, m_btnProfile};
     for (auto btn : all) {

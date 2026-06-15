@@ -31,7 +31,7 @@ EditTaskDialog::EditTaskDialog(const Task &task, QWidget *parent)
 
     // Заголовок
     QWidget *header = new QWidget(container);
-    header->setStyleSheet("background-color: #1e293b; border-top-left-radius: 18px; border-top-right-radius: 18px; border-bottom: 1px solid #334155;");
+    header->setStyleSheet("background-color: #0EA5E9; border-top-left-radius: 18px; border-top-right-radius: 18px; border-bottom: 1px solid #334155;");
     header->setFixedHeight(68);
     QHBoxLayout *headerLayout = new QHBoxLayout(header);
     headerLayout->setContentsMargins(20, 0, 20, 0);
