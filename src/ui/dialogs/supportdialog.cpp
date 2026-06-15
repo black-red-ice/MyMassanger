@@ -1,3 +1,4 @@
+#include "mainwindow.h"
 #include "supportdialog.h"
 #include "newticketdialog.h"
 #include "mainwindow.h"
@@ -211,13 +212,15 @@ QWidget* SupportDialog::createSupportCard(const QString &iconPath, const QString
                                           const QString &categoryKey)
 {
     QWidget *card = new QWidget();
+    card->setAttribute(Qt::WA_StyledBackground, true);
     card->setCursor(Qt::PointingHandCursor);
+    card->setFixedSize(200, 160);
 
     card->setStyleSheet(QString(
                             "QWidget { "
                             "   background-color: #1e293b; "
                             "   border-radius: 12px; "
-                            "   border: 1px solid rgba(29, 78, 216, 0.2); "
+                            "   border: 1px solid #334155; "
                             "}"
                             "QWidget:hover { "
                             "   border: 1px solid %1; "
@@ -273,7 +276,7 @@ QWidget* SupportDialog::createSupportCard(const QString &iconPath, const QString
 
 void SupportDialog::onCreateTicket(const QString &category)
 {
-    // Конфигурации для каждой категории (строго по скриншотам)
+    // Конфигурации для каждой категории
     TicketDialogConfig config;
 
     if (category == "it") {
@@ -324,7 +327,7 @@ void SupportDialog::onCreateTicket(const QString &category)
         };
         config.showSubtitleAsDescription = false;
     }
-    else { // other
+    else {
         config.categoryKey = "other";
         config.categoryName = "Другое";
         config.categoryColor = "#06B6D4";
@@ -340,18 +343,11 @@ void SupportDialog::onCreateTicket(const QString &category)
         config.showSubtitleAsDescription = false;
     }
 
-    qDebug() << "========================================";
-    qDebug() << "📤 Открываю диалог создания обращения";
-    qDebug() << "📤 SupportDialog видим?: " << this->isVisible();
-
-    this->hide();
-    qDebug() << "📤 SupportDialog скрыт, isVisible:" << this->isVisible();
+    //this->hide();
 
     NewTicketDialog dialog(config, this);
-    qDebug() << "📤 Запускаю dialog.exec()";
 
     if (dialog.exec() == QDialog::Accepted) {
-        qDebug() << "✅ Обращение принято";
         auto ticketData = dialog.getTicketData();
 
         SupportTicket newTicket;
@@ -380,45 +376,13 @@ void SupportDialog::onCreateTicket(const QString &category)
         m_tickets.prepend(newTicket);
         saveTickets();
 
-        QString priorityText = (ticketData.priority == "high") ? "Высокий" :
-                                   (ticketData.priority == "medium") ? "Средний" : "Низкий";
-
-        // 👇 Показываем окно поддержки перед QMessageBox
-        qDebug() << "📤 Показываю SupportDialog после успешной отправки";
-        this->show();
-        this->raise();
-        this->activateWindow();
-        qDebug() << "📤 SupportDialog isVisible после show():" << this->isVisible();
-
-        QMessageBox::information(this, "Успех", "...");
-        qDebug() << "📤 SupportDialog isVisible после QMessageBox:" << this->isVisible();
-
-    } else {
-        qDebug() << "❌ Обращение отменено/закрыто";
-        qDebug() << "📤 reopenSupportWindow():" << dialog.reopenSupportWindow();
-
-        if (dialog.reopenSupportWindow()) {
-            qDebug() << "📤 Показываю SupportDialog после отмены";
-            this->show();
-            this->raise();
-            this->activateWindow();
-
-            //QMessageBox::information(this, "Успех", "...");
-            qDebug() << "📤 SupportDialog isVisible после show():" << this->isVisible();
-        } else {
-            qDebug() << "⚠️ reopenSupportWindow() вернул false, не показываю";
-            if (dialog.reopenSupportWindow()) {
-                QTimer::singleShot(50, this, [this]() {
-                    show();
-                    raise();
-                    activateWindow();
-                });
-            }
-        }
+        QMessageBox::information(this, "Успех", "Ваше обращение отправлено!");
     }
 
-    qDebug() << "📤 SupportDialog isVisible в конце метода:" << this->isVisible();
-    qDebug() << "========================================";
+    recreateCategoryCards();
+    this->show();
+    this->raise();
+    this->activateWindow();
 }
 
 void SupportDialog::onOpenTicketsWorkspace()
@@ -1449,4 +1413,40 @@ void SupportDialog::closeEvent(QCloseEvent *event)
     event->ignore();
     hide();
     emit supportClosed();  // 👈 Сообщаем, что окно закрыто
+}
+
+void SupportDialog::recreateCategoryCards()
+{
+    // Находим виджет с сеткой категорий
+    QWidget *categoriesWidget = nullptr;
+    QList<QWidget*> widgets = findChildren<QWidget*>();
+    for (QWidget *w : widgets) {
+        if (w->layout() && dynamic_cast<QGridLayout*>(w->layout())) {
+            categoriesWidget = w;
+            break;
+        }
+    }
+    if (!categoriesWidget) return;
+
+    QGridLayout *grid = qobject_cast<QGridLayout*>(categoriesWidget->layout());
+    if (!grid) return;
+
+    // Удаляем старые карточки
+    QLayoutItem *item;
+    while ((item = grid->takeAt(0)) != nullptr) {
+        if (item->widget()) {
+            item->widget()->deleteLater();
+        }
+        delete item;
+    }
+
+    // Создаём новые карточки
+    grid->addWidget(createSupportCard(m_categoryIcons["it"], m_categoryNames["it"],
+                                      m_categoryDescriptions["it"], m_categoryColors["it"], "it"), 0, 0);
+    grid->addWidget(createSupportCard(m_categoryIcons["hr"], m_categoryNames["hr"],
+                                      m_categoryDescriptions["hr"], m_categoryColors["hr"], "hr"), 0, 1);
+    grid->addWidget(createSupportCard(m_categoryIcons["finance"], m_categoryNames["finance"],
+                                      m_categoryDescriptions["finance"], m_categoryColors["finance"], "finance"), 1, 0);
+    grid->addWidget(createSupportCard(m_categoryIcons["other"], m_categoryNames["other"],
+                                      m_categoryDescriptions["other"], m_categoryColors["other"], "other"), 1, 1);
 }

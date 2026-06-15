@@ -27,7 +27,7 @@ protected:
     void closeEvent(QCloseEvent *event) override;
 
 signals:
-    void supportClosed();  // 👈 Добавить сигнал
+    void supportClosed();
 
 public:
     explicit SupportDialog(QWidget *parent = nullptr);
@@ -46,6 +46,10 @@ private:
                                const QString &desc, const QString &color,
                                const QString &categoryKey);
     QWidget* createTicketItem(const SupportTicket &ticket);
+    void openTicketDetail(const SupportTicket &ticket,
+                          QWidget *chatContentLayout,
+                          QWidget *infoContentLayout,
+                          QWidget *inputWidget);
 
     QVector<SupportTicket> m_tickets;
 
@@ -53,11 +57,8 @@ private:
     QMap<QString, QString> m_categoryColors;
     QMap<QString, QString> m_categoryIcons;
     QMap<QString, QString> m_categoryDescriptions;
-    void openTicketDetail(const SupportTicket &ticket,
-                          QWidget *chatContentLayout,
-                          QWidget *infoContentLayout,
-                          QWidget *inputWidget);
     QWidget *m_dimWidget = nullptr;
+    void recreateCategoryCards();
 };
 
 #endif // SUPPORTDIALOG_H

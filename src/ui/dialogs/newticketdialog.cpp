@@ -20,18 +20,14 @@
 #include <QTextCursor>
 #include <QDebug>
 
-NewTicketDialog::NewTicketDialog(
-    const TicketDialogConfig &config,
-    QWidget *parent
-    )
+NewTicketDialog::NewTicketDialog(const TicketDialogConfig &config, QWidget *parent)
     : OverlayDialog(parent),
     m_config(config),
     m_reopenSupport(true)
 {
-    qDebug() << "🟢 NewTicketDialog создан, m_reopenSupport = true";
+    setFixedSize(640, 800);  // значительно увеличиваем размеры
     setupUI();
 }
-
 
 NewTicketDialog::~NewTicketDialog()
 {
@@ -924,16 +920,14 @@ bool NewTicketDialog::eventFilter(QObject *obj, QEvent *event)
 
 void NewTicketDialog::reject()
 {
-    qDebug() << "🟡 reject() вызван, устанавливаю m_reopenSupport = true";
     m_reopenSupport = true;
-    OverlayDialog::reject();
+    QDialog::reject();
 }
 
 void NewTicketDialog::accept()
 {
-    qDebug() << "🟢 accept() вызван, устанавливаю m_reopenSupport = false";
     m_reopenSupport = false;
-    OverlayDialog::accept();
+    QDialog::accept();
 }
 
 void NewTicketDialog::keyPressEvent(QKeyEvent *event)
