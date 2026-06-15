@@ -83,6 +83,9 @@ set(PROJECT_SOURCES
     src/ui/dialogs/UserProfileDialog.h
     src/ui/dialogs/newticketdialog.h
     src/ui/dialogs/newticketdialog.cpp
+    src/ui/panels/calendarPanel/EventItemWidget.cpp
+    src/ui/panels/calendarPanel/EventItemWidget.h
+    src/ui/panels/calendarPanel/CalendarEvent.h
 )
 
 # Подключаем ресурсы

@@ -1,6 +1,7 @@
 #include "CalendarPanel.h"
 #include "EventDialog.h"
 #include "EventDetailDialog.h"
+#include "EventItemWidget.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -9,6 +10,7 @@
 #include <QFrame>
 #include <QMouseEvent>
 #include <QMessageBox>
+#include <QLocale>
 
 CalendarPanel::CalendarPanel(QWidget *parent)
     : SidePanel(parent,
@@ -103,7 +105,8 @@ void CalendarPanel::setupCalendar()
     QHBoxLayout *eventsHeaderLayout = new QHBoxLayout(eventsHeader);
     eventsHeaderLayout->setContentsMargins(16, 12, 16, 8);
 
-    m_selectedDateLabel = new QLabel("События на " + QDate::currentDate().toString("d MMMM yyyy"));
+    QLocale russianLocale(QLocale::Russian);
+    m_selectedDateLabel = new QLabel("События на " + russianLocale.toString(QDate::currentDate(), "d MMMM yyyy"));
     m_selectedDateLabel->setStyleSheet("color: #f1f5f9; font-size: 14px; font-weight: 600; background: transparent;");
 
     QPushButton *addEventBtn = new QPushButton("+ Добавить");
@@ -144,13 +147,15 @@ void CalendarPanel::setupCalendar()
 
 void CalendarPanel::onDateSelected(const QDate &date)
 {
-    m_selectedDateLabel->setText("События на " + date.toString("d MMMM yyyy"));
+    QLocale russianLocale(QLocale::Russian);
+    m_selectedDateLabel->setText("События на " + russianLocale.toString(date, "d MMMM yyyy"));
     updateEventsList(date);
 }
 
 void CalendarPanel::updateEventsList(const QDate &date)
 {
-    while (m_eventsLayout->count() > 1) {
+    // Очищаем лейаут
+    while (m_eventsLayout->count() > 0) {
         QLayoutItem *item = m_eventsLayout->takeAt(0);
         if (item->widget()) delete item->widget();
         delete item;
@@ -176,55 +181,31 @@ void CalendarPanel::updateEventsList(const QDate &date)
         emptyLayout->addSpacing(8);
         emptyLayout->addWidget(emptyText);
 
-        m_eventsLayout->insertWidget(0, emptyWidget);
+        m_eventsLayout->addWidget(emptyWidget);
     } else {
-        for (int i = 0; i < events.size(); ++i) {
-            const CalendarEvent &event = events[i];
-
-            QWidget *eventCard = new QWidget();
-            eventCard->setStyleSheet(
-                QString("background: #1e293b; border-radius: 10px; border: 1px solid #334155; "
-                        "border-left: 4px solid %1; padding: 10px 14px;")
-                    .arg(event.color)
-                );
-            eventCard->setCursor(Qt::PointingHandCursor);
-
-            QHBoxLayout *cardLayout = new QHBoxLayout(eventCard);
-            cardLayout->setContentsMargins(0, 0, 0, 0);
-            cardLayout->setSpacing(10);
-
-            QLabel *dot = new QLabel("●");
-            dot->setStyleSheet(QString("color: %1; font-size: 10px; background: transparent;").arg(event.color));
-
-            QVBoxLayout *textLayout = new QVBoxLayout();
-            textLayout->setSpacing(2);
-
-            QLabel *eventLabel = new QLabel(event.title);
-            eventLabel->setStyleSheet("color: #f1f5f9; font-size: 13px; font-weight: 500; background: transparent;");
-            eventLabel->setWordWrap(true);
-
-            QLabel *timeLabel = new QLabel(event.dateTime.toString("hh:mm"));
-            timeLabel->setStyleSheet("color: #64748B; font-size: 11px; background: transparent;");
-
-            textLayout->addWidget(eventLabel);
-            textLayout->addWidget(timeLabel);
-
-            cardLayout->addWidget(dot);
-            cardLayout->addLayout(textLayout, 1);
-
-            // Данные для клика
-            eventCard->setProperty("eventIndex", i);
-            eventCard->setProperty("eventDate", date);
-            eventCard->installEventFilter(this);
-
-            m_eventsLayout->insertWidget(m_eventsLayout->count() - 1, eventCard);
+        for (const CalendarEvent &event : events) {
+            EventItemWidget *item = new EventItemWidget(event);
+            connect(item, &EventItemWidget::clicked, this, [this, event]() {
+                onEventClicked(event);
+            });
+            connect(item, &EventItemWidget::deleted, this, [this, event, date]() {
+                // Удаляем событие
+                QList<CalendarEvent> &eventsList = m_events[date];
+                for (int i = 0; i < eventsList.size(); ++i) {
+                    if (eventsList[i].title == event.title &&
+                        eventsList[i].dateTime == event.dateTime) {
+                        eventsList.removeAt(i);
+                        break;
+                    }
+                }
+                // Обновляем список
+                updateEventsList(date);
+            });
+            m_eventsLayout->addWidget(item);
         }
     }
-}
 
-void CalendarPanel::onAddClicked()
-{
-    onNewEvent();
+    m_eventsLayout->addStretch();
 }
 
 void CalendarPanel::onNewEvent()
@@ -258,13 +239,8 @@ void CalendarPanel::onNewEvent()
     dimWidget->deleteLater();
 }
 
-void CalendarPanel::onEventClicked(int index, const QDate &date)
+void CalendarPanel::onEventClicked(const CalendarEvent &event)
 {
-    QList<CalendarEvent> events = m_events.value(date);
-    if (index < 0 || index >= events.size()) return;
-
-    const CalendarEvent &event = events[index];
-
     QWidget *dimWidget = new QWidget(this->window());
     dimWidget->setObjectName("eventDetailDim");
     dimWidget->setStyleSheet("#eventDetailDim { background-color: rgba(0, 0, 0, 180); }");
@@ -287,16 +263,12 @@ void CalendarPanel::onEventClicked(int index, const QDate &date)
     dimWidget->deleteLater();
 }
 
+void CalendarPanel::onAddClicked()
+{
+    onNewEvent();
+}
+
 bool CalendarPanel::eventFilter(QObject *obj, QEvent *event)
 {
-    if (event->type() == QEvent::MouseButtonPress) {
-        QWidget *widget = qobject_cast<QWidget*>(obj);
-        if (widget && widget->property("eventIndex").isValid()) {
-            int index = widget->property("eventIndex").toInt();
-            QDate date = widget->property("eventDate").toDate();
-            onEventClicked(index, date);
-            return true;
-        }
-    }
     return SidePanel::eventFilter(obj, event);
 }
