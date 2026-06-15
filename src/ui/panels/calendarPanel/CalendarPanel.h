@@ -14,6 +14,9 @@ class CalendarPanel : public SidePanel
 
 public:
     explicit CalendarPanel(QWidget *parent = nullptr);
+    void setEventsFromJson(const QJsonArray &events);
+    void loadEventsFromServer();
+    void saveEventsToServer();
 
 protected:
     void onAddClicked() override;
@@ -24,9 +27,10 @@ private slots:
     void onNewEvent();
 
 private:
-    void setupCalendar();                     // ← добавить
-    void updateEventsList(const QDate &date); // ← добавить
-    void onEventClicked(const CalendarEvent &event); // ← добавить
+    void setupCalendar();
+    void updateEventsList(const QDate &date);
+    void onEventClicked(const CalendarEvent &event);
+
 
     QCalendarWidget *m_calendar;
     QLabel *m_selectedDateLabel;

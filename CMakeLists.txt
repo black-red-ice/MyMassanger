@@ -86,6 +86,8 @@ set(PROJECT_SOURCES
     src/ui/panels/calendarPanel/EventItemWidget.cpp
     src/ui/panels/calendarPanel/EventItemWidget.h
     src/ui/panels/calendarPanel/CalendarEvent.h
+    src/ui/panels/calendarPanel/EditEventDialog.cpp
+    src/ui/panels/calendarPanel/EditEventDialog.h
 )
 
 # Подключаем ресурсы

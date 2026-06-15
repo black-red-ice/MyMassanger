@@ -111,6 +111,8 @@ public:
     bool isNetworkConnected() const { return networkManager && networkManager->isConnected(); }
     NetworkManager* getNetworkManager() const { return networkManager; }
     void clearAvatarCache();
+    void requestCalendarEvents();
+    QJsonArray m_pendingCalendarEvents;
 
 protected:
     bool nativeEvent(const QByteArray &eventType, void *message, qintptr *result) override;

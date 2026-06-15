@@ -1,6 +1,7 @@
 #include "CalendarPanel.h"
 #include "EventDialog.h"
 #include "EventDetailDialog.h"
+#include "EditEventDialog.h"
 #include "EventItemWidget.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -11,9 +12,14 @@
 #include <QMouseEvent>
 #include <QMessageBox>
 #include <QLocale>
-#include <QCalendarWidget>   // ← добавить
-#include <QTableView>        // ← добавить
-#include <QHeaderView>       // ← добавить
+#include <QCalendarWidget>
+#include <QTableView>
+#include <QHeaderView>
+#include <QUuid>
+#include <QJsonArray>
+#include <QJsonObject>
+#include <QJsonDocument>
+#include "../../mainwindow.h"
 
 CalendarPanel::CalendarPanel(QWidget *parent)
     : SidePanel(parent,
@@ -221,6 +227,8 @@ void CalendarPanel::updateEventsList(const QDate &date)
 
 void CalendarPanel::onNewEvent()
 {
+    qDebug() << "=== onNewEvent START ===";
+
     QWidget *dimWidget = new QWidget(this->window());
     dimWidget->setObjectName("eventDim");
     dimWidget->setStyleSheet("#eventDim { background-color: rgba(0, 0, 0, 180); }");
@@ -231,8 +239,10 @@ void CalendarPanel::onNewEvent()
     EventDialog dialog(dimWidget);
     if (dialog.exec() == QDialog::Accepted) {
         QDate selectedDate = m_calendar->selectedDate();
+        qDebug() << "Selected date:" << selectedDate.toString();
 
         CalendarEvent event;
+        event.id = QUuid::createUuid().toString(QUuid::WithoutBraces);
         event.title = dialog.getTitle();
         event.description = dialog.getDescription();
         event.dateTime = dialog.getDateTime();
@@ -241,13 +251,22 @@ void CalendarPanel::onNewEvent()
         event.color = dialog.getColor();
         event.participants = dialog.getParticipants();
 
+        qDebug() << "New event created - id:" << event.id << "title:" << event.title;
+
         if (!event.title.isEmpty()) {
             m_events[selectedDate].append(event);
             updateEventsList(selectedDate);
+            qDebug() << "Event added to local storage, calling saveEventsToServer()";
+            saveEventsToServer();
+        } else {
+            qDebug() << "Event title is empty, not saving";
         }
+    } else {
+        qDebug() << "Dialog rejected";
     }
 
     dimWidget->deleteLater();
+    qDebug() << "=== onNewEvent END ===";
 }
 
 void CalendarPanel::onEventClicked(const CalendarEvent &event)
@@ -265,25 +284,64 @@ void CalendarPanel::onEventClicked(const CalendarEvent &event)
         event.dateTime,
         event.duration,
         event.eventType,
-        event.color,
         event.participants,
         dimWidget
         );
 
     // Подключаем сигнал редактирования
     connect(&dialog, &EventDetailDialog::editRequested, this, [this, event, dimWidget]() {
-        // Закрываем текущий диалог
+        // Закрываем диалог деталей
         dimWidget->deleteLater();
 
-        // Открываем диалог редактирования (нужно создать EditEventDialog или использовать EventDialog с предзаполненными данными)
-        // Пока просто выведем сообщение, позже реализуем полноценное редактирование
-        QMessageBox::information(this, "Редактирование", "Функция редактирования событий будет добавлена в следующей версии.");
+        // Создаём диалог редактирования
+        QWidget *editDimWidget = new QWidget(this->window());
+        editDimWidget->setObjectName("editEventDim");
+        editDimWidget->setStyleSheet("#editEventDim { background-color: rgba(0, 0, 0, 180); }");
+        editDimWidget->setGeometry(this->window()->rect());
+        editDimWidget->raise();
+        editDimWidget->show();
 
-        // TODO: Создать диалог редактирования события
+        EditEventDialog editDialog(event, editDimWidget);
+
+        if (editDialog.exec() == QDialog::Accepted) {
+            CalendarEvent updatedEvent = editDialog.getEvent();
+            updatedEvent.id = event.id; // Сохраняем ID
+
+            // Находим и обновляем событие
+            QDate eventDate = event.dateTime.date();
+            QList<CalendarEvent> &events = m_events[eventDate];
+            for (int i = 0; i < events.size(); ++i) {
+                if (events[i].id == event.id) {
+                    // Обновляем все поля
+                    events[i].title = updatedEvent.title;
+                    events[i].description = updatedEvent.description;
+                    events[i].dateTime = updatedEvent.dateTime;
+                    events[i].duration = updatedEvent.duration;
+                    events[i].eventType = updatedEvent.eventType;
+                    events[i].color = updatedEvent.color;
+                    events[i].participants = updatedEvent.participants;
+
+                    // Если дата изменилась, перемещаем событие
+                    if (updatedEvent.dateTime.date() != eventDate) {
+                        m_events[updatedEvent.dateTime.date()].append(events[i]);
+                        events.removeAt(i);
+                    }
+                    break;
+                }
+            }
+
+            // Обновляем отображение
+            updateEventsList(m_calendar->selectedDate());
+            m_calendar->update();
+
+            // Сохраняем на сервер
+            saveEventsToServer();
+        }
+
+        editDimWidget->deleteLater();
     });
 
     dialog.exec();
-
     dimWidget->deleteLater();
 }
 
@@ -295,4 +353,105 @@ void CalendarPanel::onAddClicked()
 bool CalendarPanel::eventFilter(QObject *obj, QEvent *event)
 {
     return SidePanel::eventFilter(obj, event);
+}
+
+void CalendarPanel::loadEventsFromServer()
+{
+    qDebug() << "=== loadEventsFromServer START ===";
+
+    MainWindow *mw = qobject_cast<MainWindow*>(this->window());
+    if (!mw) {
+        qDebug() << "❌ MainWindow not found!";
+        return;
+    }
+
+    if (!mw->getNetworkManager() || !mw->getNetworkManager()->isConnected()) {
+        qDebug() << "❌ Not connected to server!";
+        return;
+    }
+
+    QJsonObject data;
+    mw->getNetworkManager()->sendJson("get_calendar_events", data);
+    qDebug() << "Requested calendar events from server";
+}
+
+void CalendarPanel::saveEventsToServer()
+{
+    qDebug() << "=== saveEventsToServer START ===";
+
+    MainWindow *mw = qobject_cast<MainWindow*>(this->window());
+    if (!mw) {
+        qDebug() << "❌ MainWindow not found!";
+        return;
+    }
+
+    if (!mw->getNetworkManager()) {
+        qDebug() << "❌ NetworkManager is null!";
+        return;
+    }
+
+    if (!mw->getNetworkManager()->isConnected()) {
+        qDebug() << "❌ Not connected to server!";
+        return;
+    }
+
+    QJsonArray eventsArray;
+    int totalEvents = 0;
+
+    for (auto it = m_events.begin(); it != m_events.end(); ++it) {
+        for (const CalendarEvent &event : it.value()) {
+            QJsonObject obj;
+            obj["id"] = event.id;
+            obj["title"] = event.title;
+            obj["description"] = event.description;
+            obj["dateTime"] = event.dateTime.toString(Qt::ISODate);
+            obj["duration"] = event.duration;
+            obj["eventType"] = event.eventType;
+            obj["color"] = event.color;
+            obj["participants"] = event.participants;
+            eventsArray.append(obj);
+            totalEvents++;
+
+            qDebug() << "  Event:" << event.title << "| date:" << event.dateTime.toString() << "| id:" << event.id;
+        }
+    }
+
+    qDebug() << "📤 Sending" << totalEvents << "events to server";
+    qDebug() << "📤 JSON:" << QJsonDocument(eventsArray).toJson(QJsonDocument::Compact);
+
+    QJsonObject data;
+    data["events"] = eventsArray;
+    mw->getNetworkManager()->sendJson("save_calendar_events", data);
+
+    qDebug() << "=== saveEventsToServer END ===";
+}
+
+void CalendarPanel::setEventsFromJson(const QJsonArray &events)
+{
+    qDebug() << "=== setEventsFromJson START ===";
+    qDebug() << "Received" << events.size() << "events from server";
+
+    m_events.clear();
+
+    for (const QJsonValue &v : events) {
+        QJsonObject obj = v.toObject();
+        CalendarEvent event;
+        event.id = obj["id"].toString();
+        event.title = obj["title"].toString();
+        event.description = obj["description"].toString();
+        event.dateTime = QDateTime::fromString(obj["dateTime"].toString(), Qt::ISODate);
+        event.duration = obj["duration"].toString();
+        event.eventType = obj["eventType"].toString();
+        event.color = obj["color"].toString();
+        event.participants = obj["participants"].toString();
+
+        qDebug() << "  Loaded event:" << event.title << "| date:" << event.dateTime.toString() << "| id:" << event.id;
+
+        QDate eventDate = event.dateTime.date();
+        m_events[eventDate].append(event);
+    }
+
+    updateEventsList(m_calendar->selectedDate());
+    m_calendar->update();
+    qDebug() << "=== setEventsFromJson END ===";
 }

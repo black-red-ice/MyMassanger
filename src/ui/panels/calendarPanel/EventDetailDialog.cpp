@@ -9,17 +9,9 @@ EventDetailDialog::EventDetailDialog(const QString &title,
                                      const QDateTime &dateTime,
                                      const QString &duration,
                                      const QString &eventType,
-                                     const QString &color,
                                      const QString &participants,
                                      QWidget *parent)
-    : OverlayDialog(parent),
-    m_title(title),
-    m_description(description),
-    m_dateTime(dateTime),
-    m_duration(duration),
-    m_eventType(eventType),
-    m_color(color),
-    m_participants(participants)
+    : OverlayDialog(parent)
 {
     setFixedSize(540, 560);
     setStyleSheet("background: transparent;");
@@ -38,10 +30,10 @@ EventDetailDialog::EventDetailDialog(const QString &title,
     containerLayout->setContentsMargins(0, 0, 0, 0);
     containerLayout->setSpacing(0);
 
-    // Заголовок
+    // Заголовок (всегда бирюзовый)
     QWidget *header = new QWidget();
     header->setStyleSheet(
-        QString("background: %1; border-top-left-radius: 18px; border-top-right-radius: 18px;").arg(color)
+        "background: #059669; border-top-left-radius: 18px; border-top-right-radius: 18px;"
         );
     header->setFixedHeight(60);
     QHBoxLayout *headerLayout = new QHBoxLayout(header);
@@ -95,7 +87,7 @@ EventDetailDialog::EventDetailDialog(const QString &title,
     QHBoxLayout *buttonLayout = new QHBoxLayout();
     buttonLayout->setSpacing(12);
 
-    // Кнопка "Закрыть" (теперь первая)
+    // Кнопка "Закрыть"
     QPushButton *closeButton = new QPushButton("Закрыть");
     closeButton->setFixedHeight(44);
     closeButton->setCursor(Qt::PointingHandCursor);
@@ -105,7 +97,7 @@ EventDetailDialog::EventDetailDialog(const QString &title,
         );
     connect(closeButton, &QPushButton::clicked, this, &QDialog::reject);
 
-    // Кнопка "Редактировать" (теперь вторая)
+    // Кнопка "Редактировать"
     QPushButton *editBtn = new QPushButton("Редактировать");
     editBtn->setFixedHeight(44);
     editBtn->setCursor(Qt::PointingHandCursor);
@@ -125,5 +117,5 @@ EventDetailDialog::EventDetailDialog(const QString &title,
 void EventDetailDialog::onEditClicked()
 {
     emit editRequested();
-    accept();  // Закрываем диалог деталей перед открытием диалога редактирования
+    accept();
 }

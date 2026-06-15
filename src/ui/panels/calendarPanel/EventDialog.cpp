@@ -349,6 +349,14 @@ EventDialog::EventDialog(QWidget *parent)
         "QPushButton:hover { background: #047857; }"
         );
     connect(saveBtn, &QPushButton::clicked, this, [this]() {
+        if (m_title->text().trimmed().isEmpty()) {
+            m_title->setStyleSheet(
+                "QLineEdit { background: #0f172a; border: 1px solid #EF4444; border-radius: 10px; color: #f1f5f9; padding: 12px 16px; font-size: 14px; }"
+                "QLineEdit:focus { border-color: #EF4444; }"
+                );
+            m_title->setFocus();
+            return;
+        }
         accept();
     });
 

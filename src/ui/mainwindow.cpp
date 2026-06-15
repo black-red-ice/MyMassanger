@@ -841,11 +841,23 @@ void MainWindow::onToggleSidePanel(int panelType)
     }
     // ================= CALENDAR =================
     if (panelType == 3) {
+        qDebug() << "=== Opening Calendar Panel ===";
+
         if (!m_sidePanels.contains(3)) {
             CalendarPanel *panel = new CalendarPanel(m_overlay);
             connect(panel, &SidePanel::closeRequested, this, [this]() {
                 onCloseSidePanel();
             });
+
+            if (!m_pendingCalendarEvents.isEmpty()) {
+                qDebug() << "Loading pending events:" << m_pendingCalendarEvents.size();
+                panel->setEventsFromJson(m_pendingCalendarEvents);
+                m_pendingCalendarEvents = QJsonArray();
+            } else {
+                qDebug() << "No pending events, requesting from server";
+                panel->loadEventsFromServer();
+            }
+
             m_sidePanels[3] = panel;
         }
 
@@ -1021,6 +1033,7 @@ void MainWindow::onNetworkConnected()
         requestClients();
         requestCompanies();
         requestDocuments();
+        requestCalendarEvents();
 
         // Запросить статусы всех онлайн-пользователей
         QJsonObject data;
@@ -2185,6 +2198,26 @@ void MainWindow::onJson(const QJsonObject& obj)
         QMessageBox::information(this, "Успех", "Аккаунт создан. Теперь вы можете войти.");
         emit registrationCompleted();
     }
+    else if (type == "save_calendar_events") {
+        QString status = data["status"].toString();
+        qDebug() << "📅 Server response for save_calendar_events:" << status;
+        if (status == "ok") {
+            qDebug() << "✅ Events saved successfully on server";
+        } else {
+            qDebug() << "❌ Failed to save events on server";
+        }
+    }
+    else if (type == "get_calendar_events") {
+        QJsonArray events = data["events"].toArray();
+        qDebug() << "📅 Received" << events.size() << "calendar events from server";
+        CalendarPanel *panel = qobject_cast<CalendarPanel*>(m_sidePanels.value(3));
+        if (panel) {
+            panel->setEventsFromJson(events);
+        } else {
+            m_pendingCalendarEvents = events;
+            qDebug() << "Calendar panel not created yet, storing pending events";
+        }
+    }
 }
 
 void MainWindow::onChatsReceived(const QJsonArray &chats)
@@ -3212,4 +3245,10 @@ void MainWindow::updateLastMessageInChat(int chatId, const QString &lastMessage,
     // Обновляем UI
     m_middlePanel->setChats(m_chats);
     updateChatAvatars();
+}
+
+void MainWindow::requestCalendarEvents()
+{
+    if (!networkManager || !networkManager->isConnected()) return;
+    networkManager->sendJson("get_calendar_events", {});
 }
