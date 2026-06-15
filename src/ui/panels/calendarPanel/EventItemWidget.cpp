@@ -103,17 +103,16 @@ EventItemWidget::EventItemWidget(const CalendarEvent &event, QWidget *parent)
         infoLayout->addWidget(m_participantsLabel);
     }
 
-    // Тип события
+    // Тип события — закруглённый бейдж
     m_typeLabel = new QLabel(event.eventType);
     m_typeLabel->setStyleSheet(
-        QString("color: %1; font-size: 10px; background: rgba(51, 65, 85, 0.8); border-radius: 10px; padding: 2px 6px; margin-top: 2px;")
+        QString("color: %1; background: rgba(51, 65, 85, 0.8); border-radius: 10px; padding: 2px 8px;")
             .arg(event.color)
         );
-    m_typeLabel->setMaximumWidth(120);
-    m_typeLabel->setMinimumWidth(0);
-    m_typeLabel->setAlignment(Qt::AlignLeft);
-    m_typeLabel->setWordWrap(true);
-    infoLayout->addWidget(m_typeLabel);
+    m_typeLabel->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Minimum);
+    m_typeLabel->setAlignment(Qt::AlignCenter);
+    m_typeLabel->adjustSize(); // подгоняем размер под текст
+    infoLayout->addWidget(m_typeLabel, 0, Qt::AlignLeft);
 
     main->addWidget(textContainer, 1);
 

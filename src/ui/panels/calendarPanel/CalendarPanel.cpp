@@ -41,6 +41,7 @@ void CalendarPanel::setupCalendar()
     m_calendar->setVerticalHeaderFormat(QCalendarWidget::NoVerticalHeader);
     m_calendar->setSelectionMode(QCalendarWidget::SingleSelection);
 
+    // Отключаем стандартное выделение (синий фон)
     QPalette pal = m_calendar->palette();
     pal.setColor(QPalette::Highlight, Qt::transparent);
     pal.setColor(QPalette::HighlightedText, Qt::white);
@@ -48,26 +49,46 @@ void CalendarPanel::setupCalendar()
 
     m_calendar->setStyleSheet(
         "QCalendarWidget { background: #1e293b; border: none; }"
-        "QCalendarWidget QToolButton {"
-        "  color: #f1f5f9; background: transparent; border: none;"
-        "  border-radius: 8px; padding: 6px 12px; font-size: 14px; font-weight: 600;"
-        "}"
+        "QCalendarWidget QToolButton { color: #f1f5f9; background: transparent; border: none; border-radius: 8px; padding: 6px 12px; }"
         "QCalendarWidget QToolButton:hover { background: #334155; }"
         "QCalendarWidget QToolButton::menu-indicator { image: none; }"
-        "QCalendarWidget QWidget#qt_calendar_navigationbar {"
-        "  background: #1e293b; border-bottom: 1px solid #334155; padding: 8px;"
-        "}"
-        "QCalendarWidget QSpinBox {"
-        "  background: #334155; border: none; border-radius: 8px;"
-        "  color: #f1f5f9; padding: 4px 8px; font-size: 14px;"
-        "}"
+        "QCalendarWidget QWidget#qt_calendar_navigationbar { background: #1e293b; border-bottom: 1px solid #334155; padding: 8px; }"
+        "QCalendarWidget QSpinBox { background: #334155; border: none; border-radius: 8px; color: #f1f5f9; padding: 4px 8px; }"
         "QCalendarWidget QTableView { background: #1e293b; selection-background-color: transparent; }"
-        "QCalendarWidget QTableView::item { background: transparent; border: none; color: #94a3b8; }"
-        "QCalendarWidget QTableView::item:selected { background: #334155; border-radius: 12px; color: #f1f5f9; }"
-        "QCalendarWidget QTableView::item:hover { background: #2d3a4e; border-radius: 12px; }"
-        "QHeaderView::section { background: #1e293b; border: none; color: #94a3b8; padding: 4px; }"
+        "QCalendarWidget QTableView::item { background: transparent; border: none; color: #cbd5e1; }"       // цвет всех цифр
+        "QCalendarWidget QTableView::item:selected { background: #334155; border-radius: 12px; color: white; }"
+        "QCalendarWidget QHeaderView::section { background: #1e293b; border: none; color: #64748B; padding: 8px 4px; }"   // цвет дней недели
         );
 
+    // ========== РЕШЕНИЕ 1: Разделяем цвета цифр и дней недели ==========
+
+    // 1. Дни недели (заголовок) — задаём цвет через стиль с !important
+    m_calendar->setStyleSheet(m_calendar->styleSheet() +
+                              "QCalendarWidget QHeaderView::section {"
+                              "  background: #1e293b;"
+                              "  border: none;"
+                              "  color: #64748B !important;"   // ← цвет дней недели (более светлый, сероватый)
+                              "  padding: 8px 4px;"
+                              "  font-weight: 500;"
+                              "}"
+                              );
+
+    // 2. Цифры месяца (в сетке) — задаём через setHeaderTextFormat и setWeekdayTextFormat
+    QTextCharFormat headerFormat = m_calendar->headerTextFormat();
+    headerFormat.setForeground(QBrush(QColor("#cbd5e1")));  // ← светло-серый для цифр
+    m_calendar->setHeaderTextFormat(headerFormat);
+
+    // Применяем тот же цвет для всех дней недели (для цифр)
+    QTextCharFormat weekdayFormat = m_calendar->weekdayTextFormat(Qt::Monday);
+    weekdayFormat.setForeground(QBrush(QColor("#cbd5e1")));
+    for (int day = Qt::Monday; day <= Qt::Sunday; ++day) {
+        m_calendar->setWeekdayTextFormat(static_cast<Qt::DayOfWeek>(day), weekdayFormat);
+    }
+
+    // 3. Выбранная дата — текст белый (это уже задано через палитру HighlightedText)
+    // Дополнительно можно явно указать цвет для selected через стиль, но палитра уже работает.
+
+    // Настройка таблицы для отключения сетки и фокуса
     QTableView *tableView = m_calendar->findChild<QTableView*>();
     if (tableView) {
         tableView->setShowGrid(false);
