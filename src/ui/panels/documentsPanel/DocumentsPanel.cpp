@@ -18,7 +18,7 @@ DocumentsPanel::DocumentsPanel(QWidget *parent)
                 ":/icons/general/images/general/folder-light.svg",
                 "#F59E0B",
                 "Загрузить документ",
-                400,
+                420,
                 "#F59E0B",
                 ":/icons/general/images/general/cloud-arrow-up-light.svg")  // ← иконка кнопки
 {
@@ -53,9 +53,6 @@ void DocumentsPanel::onAddClicked()
     if (dialog.exec() == QDialog::Accepted) {
         QStringList files = dialog.selectedFiles();
 
-        // 🔥 СОХРАНЯЕМ ВРЕМЕННО В ОТДЕЛЬНЫЙ СПИСОК
-        QList<Document> newDocuments;
-
         for (const QString &filePath : files) {
             QFileInfo fi(filePath);
             Document doc;
@@ -68,28 +65,24 @@ void DocumentsPanel::onAddClicked()
             else if (size < 1024 * 1024) doc.size = QString::number(size / 1024.0, 'f', 1) + " КБ";
             else doc.size = QString::number(size / (1024.0 * 1024.0), 'f', 1) + " МБ";
             doc.category = dialog.category();
+            doc.fileUrl = ""; // Пока пустой, обновится после загрузки
 
-            newDocuments.append(doc);
+            // Сначала добавляем документ в список
+            m_documents.append(doc);
+            render();
 
-            // Загружаем файл на сервер
+            // Затем загружаем файл на сервер
             MainWindow *mw = qobject_cast<MainWindow*>(this->window());
             if (mw) {
-                m_pendingDocId = doc.id;
-                mw->uploadFileHttp(filePath, this, m_pendingDocId);
+                qDebug() << "📤 Uploading file for document:" << doc.id;
+                mw->uploadFileHttp(filePath, this, doc.id);
             }
         }
 
-        // 🔥 ДОБАВЛЯЕМ ТОЛЬКО ОДИН РАЗ ПОСЛЕ ЦИКЛА
-        if (!newDocuments.isEmpty()) {
-            for (const Document &doc : newDocuments) {
-                m_documents.append(doc);
-            }
-            render();
-
-            MainWindow *mw = qobject_cast<MainWindow*>(this->window());
-            if (mw) {
-                mw->saveDocumentsToServer();
-            }
+        // Сохраняем на сервер после добавления всех документов
+        MainWindow *mw = qobject_cast<MainWindow*>(this->window());
+        if (mw) {
+            mw->saveDocumentsToServer();
         }
     }
     dimWidget->deleteLater();
@@ -97,10 +90,12 @@ void DocumentsPanel::onAddClicked()
 
 void DocumentsPanel::filterDocuments(const QString &query)
 {
-    // 🔥 ОЧИЩАЕМ ВСЁ, ВКЛЮЧАЯ STRETCH
-    while (m_documentsLayout->count() > 0) {
-        QLayoutItem *item = m_documentsLayout->takeAt(0);
-        if (item->widget()) delete item->widget();
+    // Очищаем лейаут
+    QLayoutItem *item;
+    while ((item = m_documentsLayout->takeAt(0)) != nullptr) {
+        if (item->widget()) {
+            delete item->widget();
+        }
         delete item;
     }
 
@@ -120,10 +115,12 @@ void DocumentsPanel::filterDocuments(const QString &query)
 
 void DocumentsPanel::render()
 {
-    // 🔥 ОЧИЩАЕМ ВСЁ, ВКЛЮЧАЯ STRETCH
-    while (m_documentsLayout->count() > 0) {
-        QLayoutItem *item = m_documentsLayout->takeAt(0);
-        if (item->widget()) delete item->widget();
+    // Очищаем лейаут
+    QLayoutItem *item;
+    while ((item = m_documentsLayout->takeAt(0)) != nullptr) {
+        if (item->widget()) {
+            delete item->widget();
+        }
         delete item;
     }
 
@@ -177,6 +174,9 @@ QJsonArray DocumentsPanel::getDocumentsAsJson() const
 
 void DocumentsPanel::setDocumentsFromJson(const QJsonArray &arr)
 {
+    qDebug() << "=== setDocumentsFromJson ===";
+    qDebug() << "Received documents count:" << arr.size();
+
     m_documents.clear();
     for (const QJsonValue &v : arr) {
         QJsonObject obj = v.toObject();
@@ -187,7 +187,10 @@ void DocumentsPanel::setDocumentsFromJson(const QJsonArray &arr)
         doc.date = obj["date"].toString();
         doc.size = obj["size"].toString();
         doc.category = obj["category"].toString();
-        doc.fileUrl = obj["fileUrl"].toString();  // ДОБАВИТЬ
+        doc.fileUrl = obj["fileUrl"].toString();
+
+        qDebug() << "Document:" << doc.name << "| fileUrl:" << doc.fileUrl;
+
         m_documents.append(doc);
     }
     render();
@@ -215,28 +218,26 @@ void DocumentsPanel::addDocument(const Document &doc)
 bool DocumentsPanel::eventFilter(QObject *obj, QEvent *event)
 {
     if (event->type() == QEvent::MouseButtonPress) {
+        // Проверяем, является ли объект нашей карточкой
         QWidget *widget = qobject_cast<QWidget*>(obj);
 
-        // 🔥 ПРОВЕРЯЕМ, ЕСТЬ ЛИ PROPERTY docId У САМОГО ВИДЖЕТА ИЛИ У ЕГО РОДИТЕЛЯ
-        QString docId;
         if (widget && widget->property("docId").isValid()) {
-            docId = widget->property("docId").toString();
-        } else if (widget && widget->parentWidget() && widget->parentWidget()->property("docId").isValid()) {
-            docId = widget->parentWidget()->property("docId").toString();
-        } else if (widget && widget->parentWidget() && widget->parentWidget()->parentWidget() &&
-                   widget->parentWidget()->parentWidget()->property("docId").isValid()) {
-            docId = widget->parentWidget()->parentWidget()->property("docId").toString();
-        }
-
-        if (!docId.isEmpty()) {
-            onDocumentClicked(docId);
-            return true;
+            QString docId = widget->property("docId").toString();
+            if (!docId.isEmpty()) {
+                qDebug() << "Document clicked via eventFilter, id:" << docId;
+                onDocumentClicked(docId);
+                return true;
+            }
         }
     }
     return SidePanel::eventFilter(obj, event);
 }
+
 void DocumentsPanel::onDocumentClicked(const QString &docId)
 {
+    qDebug() << "=== onDocumentClicked ===";
+    qDebug() << "Searching for docId:" << docId;
+
     // Найти документ по id
     Document *foundDoc = nullptr;
     for (Document &doc : m_documents) {
@@ -246,22 +247,41 @@ void DocumentsPanel::onDocumentClicked(const QString &docId)
         }
     }
 
-    if (!foundDoc) return;
+    if (!foundDoc) {
+        qDebug() << "❌ Document not found!";
+        QMessageBox::warning(this, "Ошибка", "Документ не найден");
+        return;
+    }
+
+    qDebug() << "✅ Found document:" << foundDoc->name;
+    qDebug() << "📁 File URL:" << foundDoc->fileUrl;
 
     // Проверяем, есть ли URL файла
     if (foundDoc->fileUrl.isEmpty()) {
-        qDebug() << "No fileUrl for document:" << foundDoc->name;
+        qDebug() << "❌ No fileUrl for document:" << foundDoc->name;
+        QMessageBox::warning(this, "Ошибка",
+                             QString("У документа '%1' нет URL для скачивания.\nВозможно, файл ещё не загружен на сервер.")
+                                 .arg(foundDoc->name));
         return;
     }
 
     // Предлагаем сохранить файл
     QString savePath = QFileDialog::getSaveFileName(this, "Сохранить файл", foundDoc->name);
-    if (savePath.isEmpty()) return;
+    if (savePath.isEmpty()) {
+        qDebug() << "❌ Save cancelled by user";
+        return;
+    }
+
+    qDebug() << "💾 Save path:" << savePath;
 
     // Скачиваем файл с сервера
     MainWindow *mw = qobject_cast<MainWindow*>(this->window());
     if (mw) {
+        qDebug() << "📥 Calling downloadFileHttp...";
         mw->downloadFileHttp(foundDoc->fileUrl, savePath);
+    } else {
+        qDebug() << "❌ MainWindow not found!";
+        QMessageBox::warning(this, "Ошибка", "Не удалось получить доступ к главному окну");
     }
 }
 
@@ -270,7 +290,7 @@ QWidget* DocumentsPanel::createDocumentCard(const Document &doc)
     QWidget *card = new QWidget();
     card->setStyleSheet(
         "QWidget#docCard { background: #1e293b; border-radius: 12px; border: 1px solid #334155; }"
-        "QWidget#docCard:hover { border: 1px solid #F59E0B; }"
+        "QWidget#docCard:hover { border: 1px solid #F59E0B; background: #263244; }"
         );
     card->setObjectName("docCard");
     card->setCursor(Qt::PointingHandCursor);
@@ -310,23 +330,13 @@ QWidget* DocumentsPanel::createDocumentCard(const Document &doc)
 
     cardLayout->addLayout(infoLayout, 1);
 
-    card->setCursor(Qt::PointingHandCursor);
-
-    // 🔥 УСТАНАВЛИВАЕМ ФИЛЬТР СОБЫТИЙ НА ВСЕ ДОЧЕРНИЕ ВИДЖЕТЫ
-    card->installEventFilter(this);
-    nameLabel->installEventFilter(this);
-    metaLabel->installEventFilter(this);
-    iconContainer->installEventFilter(this);
-    docIcon->installEventFilter(this);
-
+    // Сохраняем данные в карточку
     card->setProperty("docId", doc.id);
     card->setProperty("docName", doc.name);
-    card->setProperty("fileUrl", doc.fileUrl);  // 🔥 ДОБАВИТЬ
-    nameLabel->setProperty("docId", doc.id);
-    nameLabel->setProperty("fileUrl", doc.fileUrl);  // 🔥 ДОБАВИТЬ
-    metaLabel->setProperty("docId", doc.id);
-    iconContainer->setProperty("docId", doc.id);
-    docIcon->setProperty("docId", doc.id);
+    card->setProperty("fileUrl", doc.fileUrl);
+
+    // Устанавливаем фильтр событий на карточку (а не на дочерние виджеты)
+    card->installEventFilter(this);
 
     return card;
 }

@@ -2658,12 +2658,12 @@ void MainWindow::saveCompaniesToServer()
     networkManager->sendJson("save_companies", data);
 }
 
-void MainWindow::uploadFileHttp(const QString &filePath,
-                                DocumentsPanel *panel,
-                                const QString &docId)
+void MainWindow::uploadFileHttp(const QString &filePath, DocumentsPanel *panel, const QString &docId)
 {
     qDebug() << "=== uploadFileHttp ===";
     qDebug() << "FILE:" << filePath;
+    qDebug() << "DOC ID:" << docId;
+    qDebug() << "PANEL:" << panel;
 
     QFileInfo fi(filePath);
 
@@ -2684,79 +2684,53 @@ void MainWindow::uploadFileHttp(const QString &filePath,
     qDebug() << "✅ FILE OPENED";
     qDebug() << "SIZE:" << file->size();
 
-    QUrl url("http://87.242.118.96:8080/upload");
-
+    QUrl url(QString(API_SERVER) + "/upload");
     qDebug() << "UPLOAD URL:" << url.toString();
 
     QNetworkRequest request(url);
+    request.setRawHeader("User-Agent", "AuraClient");
+    request.setRawHeader("X-File-Name", fi.fileName().toUtf8());
+    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/octet-stream");
 
-    request.setRawHeader(
-        "User-Agent",
-        "AuraClient"
-        );
-
-    request.setRawHeader(
-        "X-File-Name",
-        fi.fileName().toUtf8()
-        );
-
-    request.setHeader(
-        QNetworkRequest::ContentTypeHeader,
-        "application/octet-stream"
-        );
-
-    QNetworkReply *reply =
-        m_httpManager->post(request, file);
+    QNetworkReply *reply = m_httpManager->post(request, file);
     file->setParent(reply);
 
-    qDebug() << "POST SENT";
-
-    connect(reply, &QNetworkReply::uploadProgress,
-            this,
-            [](qint64 sent, qint64 total)
-            {
-                qDebug() << "UPLOAD PROGRESS:" << sent << "/" << total;
-            });
+    // Сохраняем информацию для обратного вызова
+    reply->setProperty("docId", docId);
+    reply->setProperty("panel", QVariant::fromValue(panel));
 
     connect(reply, &QNetworkReply::finished, this, [reply, this]() {
+        QString docId = reply->property("docId").toString();
+        DocumentsPanel *panel = reply->property("panel").value<DocumentsPanel*>();
 
-        qDebug() << "UPLOAD FINISHED";
-        qDebug() << "HTTP STATUS:"
-                 << reply->attribute(
-                             QNetworkRequest::HttpStatusCodeAttribute
-                             ).toInt();
-
+        qDebug() << "=== UPLOAD FINISHED ===";
+        qDebug() << "HTTP STATUS:" << reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
         qDebug() << "ERROR:" << reply->error();
         qDebug() << "ERROR STRING:" << reply->errorString();
 
-        QByteArray response = reply->readAll();
-        qDebug() << "SERVER RESPONSE:" << response;
-
         if (reply->error() == QNetworkReply::NoError) {
+            QByteArray response = reply->readAll();
+            qDebug() << "SERVER RESPONSE:" << response;
 
             QJsonDocument doc = QJsonDocument::fromJson(response);
             QJsonObject obj = doc.object();
 
-            QString url = obj["url"].toString();
+            QString fileUrl = obj["url"].toString();
+            qDebug() << "PARSED URL:" << fileUrl;
 
-            qDebug() << "PARSED URL:" << url;
+            if (!fileUrl.isEmpty() && panel && !docId.isEmpty()) {
+                qDebug() << "✅ UPDATING DOCUMENT URL FOR:" << docId;
+                panel->updateDocumentUrl(docId, fileUrl);
 
-            if (!url.isEmpty()) {
-
-                QSettings settings("Aura", "Messenger");
-
-                QString avatarKey =
-                    "userAvatar_" +
-                    QString::number(m_currentUserId);
-
-                settings.setValue(avatarKey, url);
-
-                qDebug() << "Avatar uploaded, URL saved:" << url;
-
-                saveProfileToServer();
-
-                m_leftNav->updateProfileAvatar();
+                // Сохраняем обновлённые документы на сервер
+                saveDocumentsToServer();
+            } else {
+                qDebug() << "❌ CANNOT UPDATE - fileUrl empty:" << fileUrl.isEmpty()
+                    << "panel null:" << (panel == nullptr)
+                    << "docId empty:" << docId.isEmpty();
             }
+        } else {
+            qDebug() << "❌ UPLOAD ERROR:" << reply->errorString();
         }
 
         reply->deleteLater();
