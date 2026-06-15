@@ -95,6 +95,7 @@
         <file>images/general/laptop-light.svg</file>
         <file>images/general/user-tie-light.svg</file>
         <file>images/general/trash-light.svg</file>
+        <file>images/general/calendar-light.svg</file>
     </qresource>
     <qresource prefix="/icons/authorization">
         <file>images/authorization/apple-brands.svg</file>

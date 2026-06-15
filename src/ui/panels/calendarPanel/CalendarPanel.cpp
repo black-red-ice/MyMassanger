@@ -11,15 +11,18 @@
 #include <QMouseEvent>
 #include <QMessageBox>
 #include <QLocale>
+#include <QCalendarWidget>   // ← добавить
+#include <QTableView>        // ← добавить
+#include <QHeaderView>       // ← добавить
 
 CalendarPanel::CalendarPanel(QWidget *parent)
     : SidePanel(parent,
                 "Календарь",
-                ":/icons/darkTheme/images/darkTheme/calendar.svg",
-                "#10B981",
+                ":/icons/general/images/general/calendar-light.svg",
+                "#059669",
                 "",
                 380,
-                "#10B981")
+                "#059669")
 {
     QLayoutItem *stretch = getContentLayout()->takeAt(getContentLayout()->count() - 1);
     delete stretch;
@@ -34,63 +37,44 @@ CalendarPanel::CalendarPanel(QWidget *parent)
 void CalendarPanel::setupCalendar()
 {
     m_calendar = new QCalendarWidget();
+    m_calendar->setGridVisible(false);
+    m_calendar->setVerticalHeaderFormat(QCalendarWidget::NoVerticalHeader);
+    m_calendar->setSelectionMode(QCalendarWidget::SingleSelection);
+
+    QPalette pal = m_calendar->palette();
+    pal.setColor(QPalette::Highlight, Qt::transparent);
+    pal.setColor(QPalette::HighlightedText, Qt::white);
+    m_calendar->setPalette(pal);
+
     m_calendar->setStyleSheet(
-        "QCalendarWidget {"
-        "  background: #1e293b;"
-        "  border: none;"
-        "  color: #f1f5f9;"
-        "}"
+        "QCalendarWidget { background: #1e293b; border: none; }"
         "QCalendarWidget QToolButton {"
-        "  color: #f1f5f9;"
-        "  background: transparent;"
-        "  border: none;"
-        "  border-radius: 8px;"
-        "  padding: 6px 12px;"
-        "  font-size: 14px;"
-        "  font-weight: 600;"
+        "  color: #f1f5f9; background: transparent; border: none;"
+        "  border-radius: 8px; padding: 6px 12px; font-size: 14px; font-weight: 600;"
         "}"
-        "QCalendarWidget QToolButton:hover {"
-        "  background: #334155;"
-        "}"
-        "QCalendarWidget QToolButton::menu-indicator {"
-        "  image: none;"
-        "}"
-        "QCalendarWidget QTableView {"
-        "  background: #1e293b;"
-        "  selection-background-color: #10B981;"
-        "  selection-color: white;"
-        "  border: none;"
-        "  outline: none;"
-        "}"
-        "QCalendarWidget QTableView::item {"
-        "  padding: 6px;"
-        "  color: #f1f5f9;"
-        "  border-radius: 8px;"
-        "}"
-        "QCalendarWidget QTableView::item:selected {"
-        "  background: #10B981;"
-        "  color: white;"
-        "}"
-        "QCalendarWidget QAbstractItemView:enabled {"
-        "  color: #f1f5f9;"
-        "}"
+        "QCalendarWidget QToolButton:hover { background: #334155; }"
+        "QCalendarWidget QToolButton::menu-indicator { image: none; }"
         "QCalendarWidget QWidget#qt_calendar_navigationbar {"
-        "  background: #1e293b;"
-        "  border-bottom: 1px solid #334155;"
-        "  padding: 8px;"
+        "  background: #1e293b; border-bottom: 1px solid #334155; padding: 8px;"
         "}"
         "QCalendarWidget QSpinBox {"
-        "  background: #334155;"
-        "  border: none;"
-        "  border-radius: 8px;"
-        "  color: #f1f5f9;"
-        "  padding: 4px 8px;"
-        "  font-size: 14px;"
+        "  background: #334155; border: none; border-radius: 8px;"
+        "  color: #f1f5f9; padding: 4px 8px; font-size: 14px;"
         "}"
+        "QCalendarWidget QTableView { background: #1e293b; selection-background-color: transparent; }"
+        "QCalendarWidget QTableView::item { background: transparent; border: none; color: #94a3b8; }"
+        "QCalendarWidget QTableView::item:selected { background: #334155; border-radius: 12px; color: #f1f5f9; }"
+        "QCalendarWidget QTableView::item:hover { background: #2d3a4e; border-radius: 12px; }"
+        "QHeaderView::section { background: #1e293b; border: none; color: #94a3b8; padding: 4px; }"
         );
 
-    connect(m_calendar, &QCalendarWidget::clicked, this, &CalendarPanel::onDateSelected);
+    QTableView *tableView = m_calendar->findChild<QTableView*>();
+    if (tableView) {
+        tableView->setShowGrid(false);
+        tableView->setFocusPolicy(Qt::NoFocus);
+    }
 
+    connect(m_calendar, &QCalendarWidget::clicked, this, &CalendarPanel::onDateSelected);
     getContentLayout()->addWidget(m_calendar);
 
     // Разделитель
@@ -124,7 +108,7 @@ void CalendarPanel::setupCalendar()
 
     getContentLayout()->addWidget(eventsHeader);
 
-    // Скроллируемая область для событий
+    // Список событий
     QScrollArea *scrollArea = new QScrollArea();
     scrollArea->setWidgetResizable(true);
     scrollArea->setFrameShape(QFrame::NoFrame);
@@ -169,9 +153,17 @@ void CalendarPanel::updateEventsList(const QDate &date)
         emptyLayout->setAlignment(Qt::AlignCenter);
         emptyLayout->setContentsMargins(0, 30, 0, 30);
 
-        QLabel *emptyIcon = new QLabel("📅");
+        QLabel *emptyIcon = new QLabel();
         emptyIcon->setAlignment(Qt::AlignCenter);
-        emptyIcon->setStyleSheet("font-size: 36px; background: transparent;");
+        emptyIcon->setStyleSheet("background: transparent;");
+        QPixmap iconPixmap(":/icons/general/images/general/calendar-light.svg");
+        if (!iconPixmap.isNull()) {
+            emptyIcon->setPixmap(iconPixmap.scaled(48, 48, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+        } else {
+            // fallback если иконка не найдена
+            emptyIcon->setText("📅");
+            emptyIcon->setStyleSheet("font-size: 36px; background: transparent;");
+        }
 
         QLabel *emptyText = new QLabel("На этот день нет запланированных событий");
         emptyText->setAlignment(Qt::AlignCenter);
@@ -189,7 +181,6 @@ void CalendarPanel::updateEventsList(const QDate &date)
                 onEventClicked(event);
             });
             connect(item, &EventItemWidget::deleted, this, [this, event, date]() {
-                // Удаляем событие
                 QList<CalendarEvent> &eventsList = m_events[date];
                 for (int i = 0; i < eventsList.size(); ++i) {
                     if (eventsList[i].title == event.title &&
@@ -198,7 +189,6 @@ void CalendarPanel::updateEventsList(const QDate &date)
                         break;
                     }
                 }
-                // Обновляем список
                 updateEventsList(date);
             });
             m_eventsLayout->addWidget(item);

@@ -24,14 +24,13 @@ private slots:
     void onNewEvent();
 
 private:
-    void setupCalendar();
-    void updateEventsList(const QDate &date);
-    void onEventClicked(const CalendarEvent &event);
+    void setupCalendar();                     // ← добавить
+    void updateEventsList(const QDate &date); // ← добавить
+    void onEventClicked(const CalendarEvent &event); // ← добавить
 
     QCalendarWidget *m_calendar;
     QLabel *m_selectedDateLabel;
     QVBoxLayout *m_eventsLayout;
     QWidget *m_eventsContainer;
-
     QMap<QDate, QList<CalendarEvent>> m_events;
 };
